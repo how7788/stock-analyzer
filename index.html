@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📊 股票深度分析</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
+.container { max-width: 860px; margin: 0 auto; padding: 28px 16px; }
+h1 { color: #60a5fa; font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+.sub { color: #64748b; font-size: 13px; margin-bottom: 20px; }
+.tags { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.tag { padding: 5px 13px; border-radius: 20px; background: #1e293b; border: 1px solid #334155; color: #94a3b8; font-size: 12px; cursor: pointer; }
+.tag:hover { border-color: #60a5fa; color: #60a5fa; }
+.input-row { display: flex; gap: 10px; margin-bottom: 10px; }
+input { flex: 1; padding: 12px 16px; border-radius: 10px; border: 1.5px solid #334155; background: #1e293b; color: #e2e8f0; font-size: 15px; outline: none; }
+input:focus { border-color: #60a5fa; }
+button { padding: 12px 22px; border-radius: 10px; background: #2563eb; color: white; border: none; font-size: 15px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+button:disabled { background: #1e293b; color: #64748b; cursor: not-allowed; }
+.progress-wrap { margin-bottom: 14px; display: none; }
+.progress-label { color: #93c5fd; font-size: 13px; margin-bottom: 6px; }
+.progress-bar { background: #1e293b; border-radius: 6px; height: 6px; }
+.progress-fill { background: #2563eb; height: 100%; border-radius: 6px; transition: width 0.5s ease; width: 0%; }
+.result { background: #1e293b; border-radius: 12px; padding: 22px; border: 1px solid #334155; min-height: 160px; font-size: 13.5px; line-height: 1.85; }
+.placeholder { color: #334155; text-align: center; padding-top: 48px; }
+.error { color: #f87171; }
+h2 { color: #60a5fa; font-size: 16px; font-weight: 700; margin-top: 20px; margin-bottom: 6px; border-bottom: 1px solid #1e3a5f; padding-bottom: 4px; }
+h3 { color: #93c5fd; font-size: 14px; font-weight: 700; margin-top: 14px; margin-bottom: 4px; }
+strong { color: #f8fafc; }
+hr { border: none; border-top: 1px solid #334155; margin: 12px 0; }
+table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 13px; }
+td, th { padding: 6px 10px; border: 1px solid #334155; color: #e2e8f0; }
+tr:nth-child(even) td { background: #162032; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>📊 股票深度分析</h1>
+  <p class="sub">輸入代碼或名稱，搜尋最新數據，產生完整八大面向分析報告</p>
+  <div class="tags">
+    <span class="tag" onclick="setStock('2330 台積電')">2330 台積電</span>
+    <span class="tag" onclick="setStock('2317 鴻海')">2317 鴻海</span>
+    <span class="tag" onclick="setStock('2454 聯發科')">2454 聯發科</span>
+    <span class="tag" onclick="setStock('NVDA 輝達')">NVDA 輝達</span>
+    <span class="tag" onclick="setStock('AAPL 蘋果')">AAPL 蘋果</span>
+  </div>
+  <div class="input-row">
+    <input id="stockInput" type="text" placeholder="輸入股票代碼或名稱，例如：2330、台積電、NVDA" />
+    <button id="btn" onclick="analyze()">分析</button>
+  </div>
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-label" id="progressLabel">分析中...</div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+  </div>
+  <div class="result" id="result">
+    <div class="placeholder">輸入股票後按「分析」開始</div>
+  </div>
+</div>
+<script>
+function setStock(s) { document.getElementById('stockInput').value = s; }
+function setProgress(pct, label) {
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = label;
+}
+function renderMd(text) {
+  let html = text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/^# (.+)$/gm,'<h2>$1</h2>')
+    .replace(/^## (.+)$/gm,'<h2>$1</h2>')
+    .replace(/^### (.+)$/gm,'<h3>$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/^---$/gm,'<hr>');
+  const lines = html.split('\n');
+  let out = '', inTable = false, tableHtml = '';
+  for (const line of lines) {
+    if (line.startsWith('|')) {
+      if (line.includes('---')) continue;
+      const cells = line.split('|').filter(c=>c.trim());
+      if (!inTable) { inTable = true; tableHtml = '<table>'; }
+      tableHtml += '<tr>' + cells.map(c=>`<td>${c.trim()}</td>`).join('') + '</tr>';
+    } else {
+      if (inTable) { out += tableHtml + '</table>'; inTable = false; tableHtml = ''; }
+      out += line + '\n';
+    }
+  }
+  if (inTable) out += tableHtml + '</table>';
+  return out.replace(/\n/g,'<br>');
+}
+async function callAPI(prompt) {
+  const res = await fetch('/api/analyze', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ prompt })
+  });
+  const data = await res.json();
+  return data.text || '';
+}
+async function analyze() {
+  const stock = document.getElementById('stockInput').value.trim();
+  if (!stock) return;
+  document.getElementById('btn').disabled = true;
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('result').innerHTML = '';
+  try {
+    let fullText = '';
+    setProgress(5, '🔍 搜尋基本資料與估值歷史...');
+    const t1 = await callAPI(`請搜尋「${stock}」最新股價與財務資料，用繁體中文回答：\n## 一、基本資料與近期股價\n列出現價、52週高低、市值、近四季EPS、2026預估EPS，標明來源與日期。\n## 二、近3～5年 PER、PBR 歷史區間\n用表格列出每年高低點PER與PBR，說明目前估值在歷史高/中/低哪個位置。`);
+    fullText += t1; document.getElementById('result').innerHTML = renderMd(fullText);
+    setProgress(28, '💰 計算估值區間...');
+    const t2 = await callAPI(`針對「${stock}」用繁體中文回答：\n## 三、PER 估值對照表\n用表格列出近四季EPS合計與2026預估EPS，分別乘以20/30/40/50/60倍對應股價。\n## 四、便宜價、合理觀察價、過熱價\n明確給出三個具體價格區間與判斷依據。`);
+    fullText += '\n\n' + t2; document.getElementById('result').innerHTML = renderMd(fullText);
+    setProgress(52, '📈 搜尋籌碼與技術面數據...');
+    const t3 = await callAPI(`請搜尋「${stock}」最新籌碼資料，用繁體中文回答：\n## 五、籌碼與技術面判斷\n三大法人近5日買賣超、融資餘額變化、近期日均量、5MA/10MA/20MA/60MA乖離率，給出多空判斷。\n## 六、市場給高本益比的原因\n說明3～5個主要理由，分析利多是否已反映股價。`);
+    fullText += '\n\n' + t3; document.getElementById('result').innerHTML = renderMd(fullText);
+    setProgress(76, '🎯 生成多空情境與結論...');
+    const t4 = await callAPI(`針對「${stock}」用繁體中文回答：\n## 七、多空情境表\n用表格列出樂觀/中性/悲觀三種情境與對應合理價。\n## 八、明確投資結論\n直接回答：現在是否適合買？適合追高嗎？什麼價位值得重新評估？建議操作策略。`);
+    fullText += '\n\n' + t4; document.getElementById('result').innerHTML = renderMd(fullText);
+    setProgress(100, '✅ 分析完成');
+  } catch(e) {
+    document.getElementById('result').innerHTML = `<div class="error">❌ 錯誤：${e.message}</div>`;
+  }
+  document.getElementById('btn').disabled = false;
+  setTimeout(() => { document.getElementById('progressWrap').style.display = 'none'; }, 2000);
+}
+document.getElementById('stockInput').addEventListener('keydown', e => { if(e.key==='Enter') analyze(); });
+</script>
+</body>
+</html>
