@@ -12,13 +12,14 @@ export default async function handler(req, res) {
       'anthropic-version': '2023-06-01'
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-5',
       max_tokens: 1000,
       messages: [{ role: 'user', content: prompt }]
     })
   });
   
   const data = await response.json();
+  console.log('API response:', JSON.stringify(data).slice(0, 200));
   const text = data.content?.filter(b => b.type === 'text').map(b => b.text).join('\n') || '';
   res.status(200).json({ text });
 }
