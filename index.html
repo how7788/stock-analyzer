@@ -437,7 +437,7 @@ async function fetchAIZone(data){
     const res=await fetch('/api/ai-zone',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
     const bz=await res.json();
     if(!res.ok)throw new Error(bz.error||'AI 分析失敗');
-    el.outerHTML=renderBuyZoneHTML(bz, d?.currency || (d?.market==='us'?'USD':'TWD'));
+    el.outerHTML=renderBuyZoneHTML(bz, data?.currency || (data?.market==='us'?'USD':'TWD'));
   }catch(e){
     if(el)el.innerHTML=`<div style="padding:12px;color:var(--text2);font-size:12px">市場資料已取得，但 AI 技術面評估暫時不可用：${e.message}</div>`;
   }
