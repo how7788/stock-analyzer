@@ -182,6 +182,8 @@
   .news-source{color:var(--accent);font-weight:500;}
   .news-snippet{font-size:11px;color:var(--text2);margin-top:4px;line-height:1.5;}
   .news-empty{color:var(--text2);font-size:12px;text-align:center;padding:12px 0;}
+  .news-date{color:var(--text2);font-size:10px;background:var(--bg2);padding:1px 6px;border-radius:10px;}
+
 
   .updated-tag{font-size:10px;color:var(--text2);text-align:right;margin-top:4px;}
   footer{text-align:center;margin-top:40px;color:#64748b;font-size:11px;line-height:2;}
@@ -355,10 +357,30 @@ function renderBuyZoneHTML(bz){
 function renderNewsHTML(articles,isUSMarket){
   if(!articles.length)return`<div class="news-card"><div class="section-title">最新新聞輿情</div><div class="news-empty">近期無相關新聞</div></div>`;
   const items=articles.map(a=>{
-    const pub=a.published?new Date(a.published).toLocaleDateString(isUSMarket?'en-US':'zh-TW',{month:'short',day:'numeric'}):'';
-    return`<div class="news-item"><a href="${a.url}" target="_blank" rel="noopener">${a.title}</a><div class="news-meta"><span class="news-source">${a.source}</span>${pub?`<span>${pub}</span>`:''}</div>${a.snippet?`<div class="news-snippet">${a.snippet}</div>`:''}</div>`;
+    let pubStr='日期未知';
+    if(a.published){
+      try{
+        const d=new Date(a.published);
+        if(!isNaN(d)){
+          const now=new Date();
+          const diff=Math.floor((now-d)/86400000);
+          if(diff===0)pubStr='今天';
+          else if(diff===1)pubStr='昨天';
+          else if(diff<7)pubStr=diff+'天前';
+          else pubStr=d.toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'});
+        }
+      }catch(_){}
+    }
+    return`<div class="news-item">
+      <a href="${a.url}" target="_blank" rel="noopener">${a.title}</a>
+      <div class="news-meta">
+        <span class="news-source">${a.source}</span>
+        <span class="news-date">${pubStr}</span>
+      </div>
+      ${a.snippet?`<div class="news-snippet">${a.snippet}</div>`:''}
+    </div>`;
   }).join('');
-  return`<div class="news-card"><div class="section-title">最新新聞輿情（近7日）</div><div class="news-list">${items}</div></div>`;
+  return`<div class="news-card"><div class="section-title">最新新聞輿情（近14日，最新優先）</div><div class="news-list">${items}</div></div>`;
 }
 
 function renderResult(d){
@@ -407,7 +429,7 @@ function renderResult(d){
 
   // 圖表資料筆數提示
   const histCount=d.history?d.history.length:0;
-  const chartNote=histCount<60?`目前取得 ${histCount} 筆資料`:'';
+  // chart note handled in drawPriceChart
 
   document.getElementById('result').innerHTML=`
     <!-- 股價主卡：含資料日期與非即時提示 -->
@@ -478,7 +500,7 @@ function renderResult(d){
     <div class="card">
       <div class="section-title">近60日走勢（收盤價 + MA20 / MA60 / MA240）</div>
       <div class="chart-area"><canvas id="priceChart"></canvas></div>
-      ${chartNote?`<div class="chart-info">${chartNote}</div>`:''}
+      <div id="chart-note" class="chart-info"></div>
     </div>
 
     <!-- MACD 圖 -->
@@ -497,41 +519,54 @@ function loadChartJS(cb){if(window.Chart)return cb();const s=document.createElem
 
 function drawPriceChart(h){
   const ctx=document.getElementById('priceChart');if(!ctx||!h||!h.length)return;
-  // ★ 修正：只用有 close 的資料，X 軸自動 fit
-  const valid=h.filter(d=>d.close!=null);
+  // 只取有效收盤價的點，X 軸自動 fit 實際資料範圍
+  const valid=h.filter(d=>d.close!=null&&d.close>0);
   if(!valid.length)return;
   const labels=valid.map(d=>d.date.slice(5));
+  const n=valid.length;
+  // 更新資料筆數顯示
+  const noteEl=document.getElementById('chart-note');
+  if(noteEl)noteEl.textContent=n<55?`目前取得 ${n} 筆資料`:'';
   priceChart=new Chart(ctx,{type:'line',data:{labels,datasets:[
-    {label:'收盤價',data:valid.map(d=>d.close),borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,.07)',borderWidth:2,fill:true,tension:.3,pointRadius:0,spanGaps:true},
-    {label:'MA20',data:valid.map(d=>d.ma20),borderColor:'#ffd740',borderWidth:1.5,fill:false,tension:.3,pointRadius:0,spanGaps:true},
-    {label:'MA60',data:valid.map(d=>d.ma60),borderColor:'#ff9100',borderWidth:1.5,fill:false,tension:.3,pointRadius:0,spanGaps:true},
-    {label:'MA240',data:valid.map(d=>d.ma240),borderColor:'#cc44ff',borderWidth:1.5,fill:false,tension:.3,pointRadius:0,spanGaps:true},
+    {label:'收盤價',data:valid.map(d=>d.close),borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,.07)',borderWidth:2,fill:true,tension:.3,pointRadius:0,spanGaps:false},
+    {label:'MA20',data:valid.map(d=>d.ma20??null),borderColor:'#ffd740',borderWidth:1.5,fill:false,tension:.3,pointRadius:0,spanGaps:false},
+    {label:'MA60',data:valid.map(d=>d.ma60??null),borderColor:'#ff9100',borderWidth:1.5,fill:false,tension:.3,pointRadius:0,spanGaps:false},
+    {label:'MA240',data:valid.map(d=>d.ma240??null),borderColor:'#cc44ff',borderWidth:1.5,fill:false,tension:.3,pointRadius:0,spanGaps:false},
   ]},options:{responsive:true,maintainAspectRatio:false,
     interaction:{mode:'index',intersect:false},
     plugins:{legend:{labels:{color:'#94a3b8',font:{size:10},boxWidth:12,padding:10}},
       tooltip:{backgroundColor:'#1a2235',borderColor:'#1e2d45',borderWidth:1,titleColor:'#94a3b8',bodyColor:'#e2e8f0',
-        callbacks:{label:ctx=>`${ctx.dataset.label}: ${fmt(ctx.raw)}`}}},
+        callbacks:{label:c=>c.raw!=null?`${c.dataset.label}: ${fmt(c.raw)}`:null,
+          filter:i=>i.raw!=null}}},
     scales:{
-      x:{ticks:{color:'#94a3b8',font:{size:10},maxTicksLimit:8},grid:{color:'rgba(255,255,255,.04)'}},
-      y:{position:'right',ticks:{color:'#94a3b8',font:{size:10,family:'JetBrains Mono'},callback:v=>fmt(v,0)},grid:{color:'rgba(255,255,255,.04)'}}}}});
+      x:{ticks:{color:'#94a3b8',font:{size:10},maxTicksLimit:8,maxRotation:0},
+         grid:{color:'rgba(255,255,255,.04)'}},
+      y:{position:'right',
+         ticks:{color:'#94a3b8',font:{size:10,family:'JetBrains Mono'},callback:v=>fmt(v,0)},
+         grid:{color:'rgba(255,255,255,.04)'}}}}});
 }
 
 function drawMacdChart(h){
   const ctx=document.getElementById('macdChart');if(!ctx||!h||!h.length)return;
-  // ★ 修正：只用有 macd_hist 的資料
-  const valid=h.filter(d=>d.close!=null);
+  const valid=h.filter(d=>d.close!=null&&d.close>0);
+  if(!valid.length)return;
   const labels=valid.map(d=>d.date.slice(5));
   macdChart=new Chart(ctx,{type:'bar',data:{labels,datasets:[
-    {label:'MACD柱',data:valid.map(d=>d.macd_hist),backgroundColor:valid.map(d=>(d.macd_hist||0)>0?'rgba(0,212,255,.5)':'rgba(148,163,184,.4)'),borderWidth:0,spanGaps:true},
-    {label:'DIF',data:valid.map(d=>d.macd),type:'line',borderColor:'#00d4ff',borderWidth:1.5,fill:false,pointRadius:0,tension:.3,spanGaps:true},
-    {label:'DEA',data:valid.map(d=>d.macd_signal),type:'line',borderColor:'#ffd740',borderWidth:1.5,fill:false,pointRadius:0,tension:.3,spanGaps:true},
+    {label:'MACD柱',data:valid.map(d=>d.macd_hist??null),
+     backgroundColor:valid.map(d=>(d.macd_hist||0)>0?'rgba(0,212,255,.6)':'rgba(148,163,184,.5)'),
+     borderWidth:0},
+    {label:'DIF',data:valid.map(d=>d.macd??null),type:'line',borderColor:'#00d4ff',borderWidth:1.5,fill:false,pointRadius:0,tension:.3,spanGaps:false},
+    {label:'DEA',data:valid.map(d=>d.macd_signal??null),type:'line',borderColor:'#ffd740',borderWidth:1.5,fill:false,pointRadius:0,tension:.3,spanGaps:false},
   ]},options:{responsive:true,maintainAspectRatio:false,
     interaction:{mode:'index',intersect:false},
     plugins:{legend:{labels:{color:'#94a3b8',font:{size:10},boxWidth:10,padding:10}},
-      tooltip:{backgroundColor:'#1a2235',borderColor:'#1e2d45',borderWidth:1,titleColor:'#94a3b8',bodyColor:'#e2e8f0'}},
+      tooltip:{backgroundColor:'#1a2235',borderColor:'#1e2d45',borderWidth:1,titleColor:'#94a3b8',bodyColor:'#e2e8f0',
+        callbacks:{filter:i=>i.raw!=null}}},
     scales:{
-      x:{ticks:{color:'#94a3b8',font:{size:10},maxTicksLimit:8},grid:{color:'rgba(255,255,255,.04)'}},
-      y:{position:'right',ticks:{color:'#94a3b8',font:{size:9,family:'JetBrains Mono'}},grid:{color:'rgba(255,255,255,.04)'}}}}});
+      x:{ticks:{color:'#94a3b8',font:{size:10},maxTicksLimit:8,maxRotation:0},
+         grid:{color:'rgba(255,255,255,.04)'}},
+      y:{position:'right',ticks:{color:'#94a3b8',font:{size:9,family:'JetBrains Mono'}},
+         grid:{color:'rgba(255,255,255,.04)'}}}}});
 }
 </script>
 </body>
