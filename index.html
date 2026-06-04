@@ -141,6 +141,26 @@
   .risk-item{background:rgba(255,23,68,.06);border:1px solid rgba(255,23,68,.15);color:var(--text);}
   .cat-item{background:rgba(0,230,118,.06);border:1px solid rgba(0,230,118,.15);color:var(--text);}
 
+
+  /* 新聞輿情 */
+  .news-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;}
+  .news-loading{display:flex;align-items:center;gap:10px;color:var(--text2);font-size:13px;}
+  .news-loading::before{content:'';width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--yellow);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0;}
+  .news-list{display:flex;flex-direction:column;gap:10px;}
+  .news-item{padding:12px 14px;background:var(--bg3);border-radius:8px;border-left:3px solid var(--border);transition:border-color .2s;}
+  .news-item:hover{border-left-color:var(--accent);}
+  .news-item a{color:var(--text);text-decoration:none;font-size:13px;font-weight:500;line-height:1.5;display:block;margin-bottom:4px;}
+  .news-item a:hover{color:var(--accent);}
+  .news-meta{display:flex;gap:10px;align-items:center;font-size:11px;color:var(--text2);}
+  .news-source{color:var(--accent);font-weight:500;}
+  .news-snippet{font-size:12px;color:var(--text2);margin-top:4px;line-height:1.5;}
+  .sentiment-bar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+  .sent-tag{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600;}
+  .sent-positive{background:rgba(0,230,118,.12);color:var(--green);border:1px solid rgba(0,230,118,.25);}
+  .sent-negative{background:rgba(255,23,68,.12);color:var(--red);border:1px solid rgba(255,23,68,.25);}
+  .sent-neutral{background:rgba(148,163,184,.1);color:var(--text2);border:1px solid var(--border);}
+  .news-empty{color:var(--text2);font-size:13px;text-align:center;padding:16px 0;}
+
 </style>
 </head>
 <body>
@@ -220,6 +240,7 @@ async function analyze() {
     if (!res.ok) throw new Error(data.error || '查詢失敗');
     renderResult(data);
     fetchAIZone(data);
+    fetchNews(data);
   } catch(e) {
     result.innerHTML=`<div class="error-msg">⚠️ ${e.message}</div>`;
   } finally { btn.disabled=false; btn.textContent='分析'; }
@@ -387,6 +408,10 @@ function renderResult(d) {
       <div class="bz-header"><span class="ai-badge">AI</span><span class="bz-title">中長期買入評估</span></div>
       <div class="ai-loading">Claude 正在分析買入時機…</div>
     </div>
+    <div class="news-card" id="news-placeholder">
+      <div class="section-title">最新新聞輿情</div>
+      <div class="news-loading">正在搜尋最新新聞…</div>
+    </div>
     ${valHtml}
     <div class="card"><div class="section-title">近60日走勢</div><div class="chart-area"><canvas id="priceChart"></canvas></div></div>
     <div class="card"><div class="section-title">MACD</div><div class="chart-area small"><canvas id="macdChart"></canvas></div></div>
@@ -420,6 +445,46 @@ function drawMacdChart(h){
     plugins:{legend:{labels:{color:'#94a3b8',font:{size:10},boxWidth:10,padding:10}},tooltip:{backgroundColor:'#1a2235',borderColor:'#1e2d45',borderWidth:1,titleColor:'#94a3b8',bodyColor:'#e2e8f0'}},
     scales:{x:{ticks:{color:'#94a3b8',font:{size:10},maxTicksLimit:8},grid:{color:'rgba(255,255,255,.04)'}},y:{position:'right',ticks:{color:'#94a3b8',font:{size:9,family:'JetBrains Mono'}},grid:{color:'rgba(255,255,255,.04)'}}}}});
 }
+
+async function fetchNews(data) {
+  const el = document.getElementById('news-placeholder');
+  if (!el) return;
+  try {
+    const params = new URLSearchParams({
+      stock_id: data.stock_id,
+      name: data.name || data.stock_id,
+      market: data.market || 'tw'
+    });
+    const res = await fetch('/api/news?' + params);
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || '新聞載入失敗');
+    el.outerHTML = renderNewsHTML(json.articles || [], data.market === 'us');
+  } catch(e) {
+    if(el) el.innerHTML = `<div class="news-empty">新聞暫時無法載入：${e.message}</div>`;
+  }
+}
+
+function renderNewsHTML(articles, isUS) {
+  if (!articles.length) {
+    return `<div class="news-card"><div class="section-title">最新新聞輿情</div><div class="news-empty">近期無相關新聞</div></div>`;
+  }
+  const items = articles.map(a => {
+    const pub = a.published ? new Date(a.published).toLocaleDateString(isUS ? 'en-US' : 'zh-TW', {month:'short',day:'numeric'}) : '';
+    return `<div class="news-item">
+      <a href="${a.url}" target="_blank" rel="noopener">${a.title}</a>
+      <div class="news-meta">
+        <span class="news-source">${a.source}</span>
+        ${pub ? `<span>${pub}</span>` : ''}
+      </div>
+      ${a.snippet ? `<div class="news-snippet">${a.snippet}</div>` : ''}
+    </div>`;
+  }).join('');
+  return `<div class="news-card">
+    <div class="section-title">最新新聞輿情（近7日）</div>
+    <div class="news-list">${items}</div>
+  </div>`;
+}
+
 </script>
 </body>
 </html>
