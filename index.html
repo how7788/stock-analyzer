@@ -119,6 +119,28 @@
   canvas{width:100%!important;}
   .updated-tag{font-size:11px;color:var(--text2);text-align:right;margin-top:4px;}
   footer{text-align:center;margin-top:40px;color:var(--text2);font-size:11px;line-height:1.8;}
+
+  /* 決策儀表盤新增樣式 */
+  .verdict-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding:14px 16px;background:var(--bg3);border-radius:10px;}
+  .verdict-main{display:flex;align-items:center;gap:10px;}
+  .verdict-icon{font-size:20px;}
+  .verdict-label{font-size:18px;font-weight:700;}
+  .verdict-score{text-align:right;}
+  .score-num{font-family:'JetBrains Mono',monospace;font-size:28px;font-weight:700;}
+  .score-label{font-size:12px;color:var(--text2);margin-left:2px;}
+  .bz-bias-warn{background:rgba(255,23,68,.1);border:1px solid rgba(255,23,68,.3);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--red);margin-bottom:12px;}
+  .checklist-title{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin:14px 0 8px;}
+  .checklist{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+  .cl-item{display:grid;grid-template-columns:24px 1fr auto;align-items:start;gap:8px;font-size:12px;padding:6px 10px;background:var(--bg3);border-radius:6px;}
+  .cl-icon{font-size:13px;}
+  .cl-name{font-weight:500;color:var(--text);}
+  .cl-note{color:var(--text2);font-size:11px;text-align:right;}
+  .factors-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0;}
+  .factors-col{display:flex;flex-direction:column;gap:6px;}
+  .factor-item{font-size:12px;padding:7px 10px;border-radius:6px;line-height:1.5;}
+  .risk-item{background:rgba(255,23,68,.06);border:1px solid rgba(255,23,68,.15);color:var(--text);}
+  .cat-item{background:rgba(0,230,118,.06);border:1px solid rgba(0,230,118,.15);color:var(--text);}
+
 </style>
 </head>
 <body>
@@ -226,17 +248,67 @@ function renderBuyZoneHTML(bz) {
   const riskClass={low:'risk-low',medium:'risk-medium',high:'risk-high'}[bz.risk]||'risk-medium';
   const riskLabel={low:'低風險',medium:'中等風險',high:'較高風險'}[bz.risk]||'';
   const waitHtml=bz.wait_for?`<div class="bz-wait">⏳ 等待條件：${bz.wait_for}</div>`:'';
+  const biasWarnHtml=bz.bias_warning?`<div class="bz-bias-warn">🚨 ${bz.bias_warning}</div>`:'';
+
+  // 判決顏色
+  const verdictColor={buy:'var(--green)',watch:'var(--yellow)',avoid:'var(--red)'}[bz.verdict]||'var(--text2)';
+  const verdictIcon={buy:'🟢',watch:'🟡',avoid:'🔴'}[bz.verdict]||'⚪';
+  const scoreColor = bz.score>=70?'var(--green)':bz.score>=50?'var(--yellow)':'var(--red)';
+
+  // 操作清單
+  const checklistHtml = (bz.checklist||[]).map(c=>{
+    const icon={pass:'✅',warn:'⚠️',fail:'❌'}[c.status]||'•';
+    const color={pass:'var(--green)',warn:'var(--yellow)',fail:'var(--red)'}[c.status]||'var(--text2)';
+    return `<div class="cl-item"><span class="cl-icon" style="color:${color}">${icon}</span><span class="cl-name">${c.item}</span><span class="cl-note">${c.note||''}</span></div>`;
+  }).join('');
+
+  // 風險與催化劑
+  const risksHtml=(bz.risk_factors||[]).map(r=>`<div class="factor-item risk-item">⚠️ ${r}</div>`).join('');
+  const catsHtml=(bz.catalysts||[]).map(c=>`<div class="factor-item cat-item">✨ ${c}</div>`).join('');
+
   return `<div class="buy-zone-card">
-    <div class="bz-header"><span class="ai-badge">AI</span><span class="bz-title">中長期買入評估</span><span class="entry-quality ${eqClass}">${bz.entry_label||''}</span></div>
+    <div class="bz-header">
+      <span class="ai-badge">AI</span>
+      <span class="bz-title">決策儀表盤</span>
+      <span class="entry-quality ${eqClass}">${bz.entry_label||''}</span>
+    </div>
+
+    <!-- 核心判決 -->
+    <div class="verdict-row">
+      <div class="verdict-main">
+        <span class="verdict-icon">${verdictIcon}</span>
+        <span class="verdict-label" style="color:${verdictColor}">${bz.verdict_label||''}</span>
+      </div>
+      <div class="verdict-score">
+        <span class="score-num" style="color:${scoreColor}">${bz.score}</span>
+        <span class="score-label">/ 100</span>
+      </div>
+    </div>
+
+    ${biasWarnHtml}
+
+    <!-- 價位區間 -->
     <div class="bz-grid">
       <div class="bz-item buy"><label>建議買入區間</label><span>${fmt(bz.buy_low)} – ${fmt(bz.buy_high)}</span></div>
       <div class="bz-item stop"><label>中長期停損</label><span>${fmt(bz.stop_loss)}</span></div>
       <div class="bz-item t6"><label>6 個月目標</label><span>${fmt(bz.target_6m)}</span></div>
       <div class="bz-item t12"><label>12 個月目標</label><span>${fmt(bz.target_12m)}</span></div>
     </div>
+
+    <!-- 操作檢查清單 -->
+    ${checklistHtml ? `<div class="checklist-title">操作檢查清單</div><div class="checklist">${checklistHtml}</div>` : ''}
+
+    <!-- 策略與理由 -->
     <div class="bz-strategy">📋 ${bz.strategy}</div>
     <div class="bz-reason">💡 ${bz.reason}</div>
     ${waitHtml}
+
+    <!-- 風險 & 催化劑 -->
+    ${risksHtml||catsHtml ? `<div class="factors-grid">
+      ${risksHtml?`<div class="factors-col">${risksHtml}</div>`:''}
+      ${catsHtml?`<div class="factors-col">${catsHtml}</div>`:''}
+    </div>`:''}
+
     <span class="risk-badge ${riskClass}">風險評估：${riskLabel}</span>
   </div>`;
 }
