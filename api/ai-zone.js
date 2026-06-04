@@ -133,10 +133,10 @@ risk：low/medium/high
 
     try {
       return res.status(200).json(JSON.parse(jsonStr));
-    } catch(e1) {
-      jsonStr = jsonStr.replace(/"note"\s*:\s*"([^"]*)"/g, (m, v) =>
-        `"note":"${v.replace(/[\n\r"]/g, " ").trim()}"`
-      );
+    } catch(_) {
+      // 字串值內的實際換行符在 JSON 中非法，全域替換為空格
+      jsonStr = jsonStr.replace(/\r\n/g, " ").replace(/\r/g, " ").replace(/\n/g, " ");
+      jsonStr = jsonStr.replace(/,(\s*[}\]])/g, "$1");
       try {
         return res.status(200).json(JSON.parse(jsonStr));
       } catch(e2) {
