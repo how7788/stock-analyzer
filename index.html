@@ -186,6 +186,55 @@
 
 
   .updated-tag{font-size:10px;color:var(--text2);text-align:right;margin-top:4px;}
+  /* 熱門題材 */
+  .themes-panel{max-width:960px;margin:0 auto 32px;}
+  .themes-header{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
+  .themes-header h2{font-size:15px;font-weight:700;color:var(--text);}
+  .market-switch{display:flex;gap:6px;}
+  .mkt-btn{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 14px;color:var(--text2);font-size:12px;cursor:pointer;transition:all .2s;}
+  .mkt-btn.active{background:rgba(0,212,255,.12);border-color:var(--accent);color:var(--accent);}
+  .scan-btn{background:linear-gradient(135deg,#ff6b00,#ffd700);border:none;border-radius:8px;padding:8px 20px;color:#000;font-size:13px;font-weight:700;cursor:pointer;transition:opacity .2s;white-space:nowrap;}
+  .scan-btn:hover{opacity:.85;}
+  .scan-btn:disabled{opacity:.5;cursor:not-allowed;}
+  .themes-loading{text-align:center;padding:32px;color:var(--text2);font-size:13px;}
+  .themes-loading::after{content:'';display:block;width:24px;height:24px;border:2px solid var(--border);border-top-color:#ffd700;border-radius:50%;margin:12px auto 0;animation:spin .8s linear infinite;}
+  .mood-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg3);border-radius:8px;margin-bottom:16px;flex-wrap:wrap;}
+  .mood-label{font-size:12px;color:var(--text2);}
+  .mood-value{font-size:14px;font-weight:700;}
+  .mood-reason{font-size:12px;color:var(--text2);flex:1;}
+  .mood-bull{color:var(--green);} .mood-bear{color:var(--red);} .mood-neutral{color:var(--yellow);}
+  .themes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-bottom:16px;}
+  .theme-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;transition:border-color .2s;}
+  .theme-card:hover{border-color:rgba(255,215,0,.3);}
+  .theme-top{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .theme-name{font-size:15px;font-weight:700;flex:1;}
+  .theme-heat{display:flex;align-items:center;gap:4px;font-size:12px;}
+  .heat-bar{display:flex;gap:2px;}
+  .heat-dot{width:6px;height:6px;border-radius:50%;}
+  .heat-on{background:var(--yellow);}
+  .heat-off{background:var(--border);}
+  .theme-why{font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5;}
+  .theme-stocks{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}
+  .theme-stock{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg3);border-radius:6px;cursor:pointer;transition:background .2s;}
+  .theme-stock:hover{background:#1e2d45;}
+  .ts-id{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--accent);min-width:48px;}
+  .ts-name{font-size:12px;font-weight:500;flex:1;}
+  .ts-reason{font-size:10px;color:var(--text2);}
+  .theme-risk{font-size:10px;color:#f59e0b;padding:4px 8px;background:rgba(245,158,11,.08);border-radius:4px;border:1px solid rgba(245,158,11,.2);}
+  .watch-section{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px;}
+  .watch-title{font-size:12px;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;}
+  .watch-chips{display:flex;flex-wrap:wrap;gap:8px;}
+  .watch-chip{padding:5px 14px;background:var(--bg3);border:1px solid rgba(0,212,255,.2);border-radius:20px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent);cursor:pointer;transition:all .2s;}
+  .watch-chip:hover{background:rgba(0,212,255,.1);border-color:var(--accent);}
+  .avoid-chips .watch-chip{color:var(--text2);border-color:var(--border);}
+  .themes-news{margin-top:14px;}
+  .tn-item{display:flex;align-items:baseline;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;}
+  .tn-item:last-child{border-bottom:none;}
+  .tn-item a{color:var(--text2);text-decoration:none;flex:1;line-height:1.4;}
+  .tn-item a:hover{color:var(--accent);}
+  .tn-source{font-size:10px;color:var(--text2);white-space:nowrap;}
+  .themes-updated{font-size:10px;color:#64748b;text-align:right;margin-top:8px;}
+
   footer{text-align:center;margin-top:40px;color:#64748b;font-size:11px;line-height:2;}
 </style>
 </head>
@@ -194,6 +243,18 @@
   <h1>股票技術分析儀</h1>
   <div class="sub">台股 + 美股｜中長期技術面分析｜AI 輔助進場風險評估</div>
   <div class="disclaimer">適合中長線趨勢觀察，不適合作為即時交易決策依據</div>
+</div>
+
+<div class="themes-panel">
+  <div class="themes-header">
+    <h2>🔥 熱門題材掃描</h2>
+    <div class="market-switch">
+      <button class="mkt-btn active" id="theme-tw-btn" onclick="setThemeMarket('tw')">🇹🇼 台股</button>
+      <button class="mkt-btn" id="theme-us-btn" onclick="setThemeMarket('us')">🇺🇸 美股</button>
+    </div>
+    <button class="scan-btn" id="scanBtn" onclick="scanThemes()">掃描熱門題材</button>
+  </div>
+  <div id="themes-result"></div>
 </div>
 
 <div class="search-box">
@@ -568,6 +629,87 @@ function drawMacdChart(h){
       y:{position:'right',ticks:{color:'#94a3b8',font:{size:9,family:'JetBrains Mono'}},
          grid:{color:'rgba(255,255,255,.04)'}}}}});
 }
+
+let themeMarket = 'tw';
+
+function setThemeMarket(m) {
+  themeMarket = m;
+  document.getElementById('theme-tw-btn').className = 'mkt-btn' + (m==='tw'?' active':'');
+  document.getElementById('theme-us-btn').className = 'mkt-btn' + (m==='us'?' active':'');
+}
+
+async function scanThemes() {
+  const btn = document.getElementById('scanBtn');
+  const result = document.getElementById('themes-result');
+  btn.disabled = true; btn.textContent = '掃描中…';
+  result.innerHTML = '<div class="themes-loading">正在分析新聞與成交量，AI 整合中…</div>';
+  try {
+    const res = await fetch(`/api/hot-themes?market=${themeMarket}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '掃描失敗');
+    result.innerHTML = renderThemes(data);
+  } catch(e) {
+    result.innerHTML = `<div class="error-msg">⚠️ ${e.message}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = '掃描熱門題材';
+  }
+}
+
+function renderThemes(d) {
+  const moodClass = {多方:'mood-bull',盤整:'mood-neutral',偏空:'mood-bear'}[d.market_mood] || 'mood-neutral';
+  const moodIcon = {多方:'📈',盤整:'➡️',偏空:'📉'}[d.market_mood] || '➡️';
+
+  const themesHtml = (d.themes || []).map(t => {
+    const heatDots = Array.from({length:10},(_,i)=>
+      `<span class="heat-dot ${i<t.heat?'heat-on':'heat-off'}"></span>`
+    ).join('');
+    const stocksHtml = (t.key_stocks || []).map(s =>
+      `<div class="theme-stock" onclick="document.getElementById('stockInput').value='${s.id}';analyze()">
+        <span class="ts-id">${s.id}</span>
+        <span class="ts-name">${s.name}</span>
+        <span class="ts-reason">${s.reason}</span>
+      </div>`
+    ).join('');
+    return `<div class="theme-card">
+      <div class="theme-top">
+        <span class="theme-name">${t.name}</span>
+        <div class="theme-heat"><div class="heat-bar">${heatDots}</div><span style="color:var(--yellow);font-weight:700">${t.heat}/10</span></div>
+      </div>
+      <div class="theme-why">💡 ${t.why_hot}</div>
+      <div class="theme-stocks">${stocksHtml}</div>
+      ${t.risk?`<div class="theme-risk">⚠️ ${t.risk}</div>`:''}
+    </div>`;
+  }).join('');
+
+  const watchHtml = (d.watch_list||[]).map(id =>
+    `<span class="watch-chip" onclick="document.getElementById('stockInput').value='${id}';analyze()">${id}</span>`
+  ).join('');
+
+  const avoidHtml = (d.avoid_sectors||[]).map(s =>
+    `<span class="watch-chip">${s}</span>`
+  ).join('');
+
+  const newsHtml = (d.news_sources||[]).slice(0,5).map(a =>
+    `<div class="tn-item">
+      <a href="${a.url}" target="_blank" rel="noopener">${a.title}</a>
+      <span class="tn-source">${a.source}</span>
+    </div>`
+  ).join('');
+
+  return `
+    <div class="mood-bar">
+      <span class="mood-label">市場氣氛</span>
+      <span class="mood-value ${moodClass}">${moodIcon} ${d.market_mood||'—'}</span>
+      <span class="mood-reason">${d.mood_reason||''}</span>
+    </div>
+    <div class="themes-grid">${themesHtml}</div>
+    ${watchHtml?`<div class="watch-section"><div class="watch-title">📌 值得追蹤（點擊直接分析）</div><div class="watch-chips">${watchHtml}</div></div>`:''}
+    ${avoidHtml?`<div class="watch-section"><div class="watch-title">⚠️ 目前避開族群</div><div class="watch-chips avoid-chips">${avoidHtml}</div></div>`:''}
+    ${newsHtml?`<div class="watch-section themes-news"><div class="watch-title">📰 參考新聞來源</div>${newsHtml}</div>`:''}
+    <div class="themes-updated">掃描時間：${new Date().toLocaleString('zh-TW')}</div>
+  `;
+}
+
 </script>
 </body>
 </html>
