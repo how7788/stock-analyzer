@@ -91,7 +91,7 @@ async function callAPI(prompt) {
   const res = await fetch('/api/analyze', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ prompt })
+    body: JSON.stringify({ prompt, stock: document.getElementById('stockInput').value.trim() })
   });
   const data = await res.json();
   return data.text || '';
