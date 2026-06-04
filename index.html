@@ -437,7 +437,7 @@ async function fetchAIZone(data){
     const res=await fetch('/api/ai-zone',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
     const bz=await res.json();
     if(!res.ok)throw new Error(bz.error||'AI 分析失敗');
-    el.outerHTML=renderBuyZoneHTML(bz);
+    el.outerHTML=renderBuyZoneHTML(bz, d?.currency || (d?.market==='us'?'USD':'TWD'));
   }catch(e){
     if(el)el.innerHTML=`<div style="padding:12px;color:var(--text2);font-size:12px">市場資料已取得，但 AI 技術面評估暫時不可用：${e.message}</div>`;
   }
@@ -471,7 +471,8 @@ function fmtVol(v){
   return v.toLocaleString();
 }
 
-function renderBuyZoneHTML(bz){
+function renderBuyZoneHTML(bz, cur){
+  cur = cur || 'TWD';
   const eqClass={excellent:'eq-excellent',good:'eq-good',fair:'eq-fair',poor:'eq-poor'}[bz.entry_quality]||'eq-fair';
   const riskClass={low:'risk-low',medium:'risk-medium',high:'risk-high'}[bz.risk]||'risk-medium';
   const riskLabel={low:'低風險參考',medium:'中等風險參考',high:'較高風險參考'}[bz.risk]||'';
