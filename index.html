@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>股票技術分析儀｜台股 + 美股</title>
+<!-- v2.1 -->
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap');
   :root{--bg:#0a0e1a;--bg2:#111827;--bg3:#1a2235;--border:#1e2d45;--accent:#00d4ff;--accent2:#0066ff;--green:#00e676;--red:#ff1744;--yellow:#ffd740;--text:#e2e8f0;--text2:#94a3b8;--radius:12px;}
@@ -433,13 +434,14 @@ async function analyze(){
 async function fetchAIZone(data){
   const el=document.getElementById('ai-zone-placeholder');
   if(!el)return;
+  const stockCur = (data && data.currency) ? data.currency : (data && data.market==='us' ? 'USD' : 'TWD');
   try{
     const res=await fetch('/api/ai-zone',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
     const bz=await res.json();
     if(!res.ok)throw new Error(bz.error||'AI 分析失敗');
-    el.outerHTML=renderBuyZoneHTML(bz, data?.currency || (data?.market==='us'?'USD':'TWD'));
+    el.outerHTML=renderBuyZoneHTML(bz, stockCur);
   }catch(e){
-    if(el)el.innerHTML=`<div style="padding:12px;color:var(--text2);font-size:12px">市場資料已取得，但 AI 技術面評估暫時不可用：${e.message}</div>`;
+    if(el)el.innerHTML=`<div style="padding:12px;color:var(--text2);font-size:12px">市場資料已取得，但 AI 分析暫時不可用：${e.message}</div>`;
   }
 }
 
