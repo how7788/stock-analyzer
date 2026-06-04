@@ -3,25 +3,38 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>台股分析儀｜中長期</title>
+<title>股票分析儀｜台股 + 美股</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap');
   :root{--bg:#0a0e1a;--bg2:#111827;--bg3:#1a2235;--border:#1e2d45;--accent:#00d4ff;--accent2:#0066ff;--green:#00e676;--red:#ff1744;--yellow:#ffd740;--text:#e2e8f0;--text2:#94a3b8;--radius:12px;}
   *{box-sizing:border-box;margin:0;padding:0;}
   body{background:var(--bg);color:var(--text);font-family:'Noto Sans TC',sans-serif;min-height:100vh;padding:24px 16px;}
-  .header{text-align:center;margin-bottom:32px;}
+  .header{text-align:center;margin-bottom:28px;}
   .header h1{font-size:clamp(22px,4vw,32px);font-weight:700;letter-spacing:2px;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
   .header p{color:var(--text2);font-size:13px;margin-top:6px;}
-  .search-box{display:flex;gap:10px;max-width:480px;margin:0 auto 24px;}
+  .search-box{display:flex;gap:10px;max-width:480px;margin:0 auto 16px;}
   .search-box input{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px 16px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:16px;outline:none;transition:border-color .2s;}
   .search-box input:focus{border-color:var(--accent);}
   .search-box input::placeholder{color:var(--text2);}
   .search-box button{background:linear-gradient(135deg,var(--accent2),var(--accent));border:none;border-radius:8px;padding:12px 24px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .2s;white-space:nowrap;}
   .search-box button:hover{opacity:.85;}
   .search-box button:disabled{opacity:.5;cursor:not-allowed;}
-  .quick-btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:32px;}
-  .quick-btn{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:6px 14px;color:var(--text2);font-size:13px;font-family:'JetBrains Mono',monospace;cursor:pointer;transition:all .2s;}
-  .quick-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+  /* 市場切換標籤 */
+  .market-tabs{display:flex;gap:6px;justify-content:center;margin-bottom:12px;}
+  .tab-label{font-size:11px;color:var(--text2);padding:3px 12px;border-radius:20px;border:1px solid var(--border);cursor:pointer;transition:all .2s;}
+  .tab-label.tw{border-color:rgba(255,23,68,.3);color:var(--red);}
+  .tab-label.us{border-color:rgba(0,212,255,.3);color:var(--accent);}
+  .tab-label.active-tw{background:rgba(255,23,68,.12);border-color:var(--red);}
+  .tab-label.active-us{background:rgba(0,212,255,.12);border-color:var(--accent);}
+
+  .quick-group{margin-bottom:28px;}
+  .quick-group-label{text-align:center;font-size:10px;color:var(--text2);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;}
+  .quick-btns{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;}
+  .quick-btn{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 12px;color:var(--text2);font-size:12px;font-family:'JetBrains Mono',monospace;cursor:pointer;transition:all .2s;}
+  .quick-btn.tw:hover{border-color:var(--red);color:var(--red);}
+  .quick-btn.us:hover{border-color:var(--accent);color:var(--accent);}
+
   #result{max-width:960px;margin:0 auto;}
   .loading{text-align:center;padding:48px;color:var(--text2);font-size:14px;}
   .loading::after{content:'';display:block;width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;margin:16px auto 0;animation:spin .8s linear infinite;}
@@ -29,12 +42,21 @@
   .error-msg{background:rgba(255,23,68,.08);border:1px solid rgba(255,23,68,.3);border-radius:var(--radius);padding:16px 20px;color:var(--red);text-align:center;}
   .card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;}
   .section-title{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;}
-  .price-header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:4px;}
+
+  /* 市場標籤 */
+  .market-badge{display:inline-flex;align-items:center;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.5px;margin-left:8px;vertical-align:middle;}
+  .market-badge.tw{background:rgba(255,23,68,.12);color:var(--red);border:1px solid rgba(255,23,68,.25);}
+  .market-badge.us{background:rgba(0,212,255,.12);color:var(--accent);border:1px solid rgba(0,212,255,.25);}
+
+  .price-header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px;}
   .stock-name{font-size:22px;font-weight:700;}
   .stock-id{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text2);background:var(--bg3);padding:2px 8px;border-radius:4px;}
   .price-main{font-family:'JetBrains Mono',monospace;font-size:clamp(28px,5vw,42px);font-weight:600;line-height:1;margin:6px 0;}
+  .currency-tag{font-size:14px;font-weight:400;color:var(--text2);margin-left:4px;}
   .price-change{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:500;}
   .up{color:var(--red);}.down{color:var(--green);}.flat{color:var(--text2);}
+  /* 美股漲跌顏色相反 */
+  .us-up{color:var(--green);}.us-down{color:var(--red);}
   .price-meta{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);}
   .meta-item label{font-size:10px;color:var(--text2);text-transform:uppercase;display:block;margin-bottom:3px;}
   .meta-item span{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:500;}
@@ -45,36 +67,34 @@
   .ind-item .sub{font-size:10px;color:var(--text2);margin-top:3px;}
   .ma-position{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;}
   .ma-tag{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600;}
-  .ma-tag.above{background:rgba(255,23,68,.12);color:var(--red);border:1px solid rgba(255,23,68,.25);}
-  .ma-tag.below{background:rgba(0,230,118,.12);color:var(--green);border:1px solid rgba(0,230,118,.25);}
+  .ma-tag.above{background:rgba(0,212,255,.1);color:var(--accent);border:1px solid rgba(0,212,255,.2);}
+  .ma-tag.below{background:rgba(148,163,184,.08);color:var(--text2);border:1px solid rgba(148,163,184,.2);}
   .signal-card{border-left:4px solid var(--accent);}
-  .signal-card.bullish{border-left-color:var(--red);}
-  .signal-card.bearish{border-left-color:var(--green);}
+  .signal-card.bullish{border-left-color:var(--accent);}
+  .signal-card.bearish{border-left-color:rgba(148,163,184,.5);}
   .signal-card.neutral{border-left-color:var(--yellow);}
   .signal-score{display:flex;gap:12px;margin-bottom:8px;}
-  .score-bull{font-size:13px;color:var(--red);font-weight:600;}
-  .score-bear{font-size:13px;color:var(--green);font-weight:600;}
+  .score-bull{font-size:13px;color:var(--accent);font-weight:600;}
+  .score-bear{font-size:13px;color:var(--text2);font-weight:600;}
   .signal-summary{font-size:18px;font-weight:700;margin-bottom:12px;}
   .signal-items{display:flex;flex-direction:column;gap:6px;}
   .signal-item{display:flex;align-items:flex-start;gap:8px;font-size:13px;}
   .signal-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px;}
-  .sig-bullish .signal-dot{background:var(--red);}
-  .sig-bearish .signal-dot{background:var(--green);}
+  .sig-bullish .signal-dot{background:var(--accent);}
+  .sig-bearish .signal-dot{background:var(--text2);}
   .sig-neutral .signal-dot{background:var(--yellow);}
   .val-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;}
   .val-item{background:var(--bg3);border-radius:8px;padding:12px;border:1px solid var(--border);}
   .val-item label{font-size:10px;color:var(--text2);display:block;margin-bottom:4px;}
   .val-item span{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;}
-
-  /* AI 卡 */
   .buy-zone-card{background:var(--bg2);border:1px solid rgba(0,212,255,.2);border-radius:var(--radius);padding:20px;margin-bottom:16px;position:relative;overflow:hidden;}
   .buy-zone-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent2),var(--accent));}
   .bz-header{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
   .ai-badge{background:linear-gradient(135deg,var(--accent2),var(--accent));color:#fff;font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px;letter-spacing:1px;}
   .bz-title{font-size:14px;color:var(--text2);}
   .entry-quality{font-size:13px;font-weight:700;padding:3px 12px;border-radius:20px;}
-  .eq-excellent{background:rgba(255,23,68,.15);color:var(--red);border:1px solid rgba(255,23,68,.3);}
-  .eq-good{background:rgba(0,212,255,.12);color:var(--accent);border:1px solid rgba(0,212,255,.25);}
+  .eq-excellent{background:rgba(0,212,255,.15);color:var(--accent);border:1px solid rgba(0,212,255,.3);}
+  .eq-good{background:rgba(0,230,118,.12);color:var(--green);border:1px solid rgba(0,230,118,.25);}
   .eq-fair{background:rgba(255,215,64,.12);color:var(--yellow);border:1px solid rgba(255,215,64,.25);}
   .eq-poor{background:rgba(148,163,184,.12);color:var(--text2);border:1px solid rgba(148,163,184,.25);}
   .bz-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:14px;}
@@ -94,85 +114,114 @@
   .risk-high{background:rgba(255,23,68,.12);color:var(--red);border:1px solid rgba(255,23,68,.3);}
   .ai-loading{display:flex;align-items:center;gap:10px;color:var(--text2);font-size:13px;padding:8px 0;}
   .ai-loading::before{content:'';width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0;}
-
   .chart-area{position:relative;height:200px;margin-top:8px;}
   .chart-area.small{height:90px;}
   canvas{width:100%!important;}
-  .rev-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
-  .rev-item{background:var(--bg3);border-radius:8px;padding:12px;}
-  .rev-item label{font-size:10px;color:var(--text2);display:block;margin-bottom:3px;}
-  .rev-item span{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:600;}
   .updated-tag{font-size:11px;color:var(--text2);text-align:right;margin-top:4px;}
   footer{text-align:center;margin-top:40px;color:var(--text2);font-size:11px;line-height:1.8;}
 </style>
 </head>
 <body>
 <div class="header">
-  <h1>台股分析儀</h1>
-  <p>中長期技術面分析｜AI 買入時機評估</p>
+  <h1>股票分析儀</h1>
+  <p>台股 + 美股｜中長期技術分析｜AI 買入評估</p>
 </div>
+
 <div class="search-box">
-  <input id="stockInput" type="text" placeholder="股票代號，例如 2330" maxlength="6" onkeydown="if(event.key==='Enter') analyze()">
+  <input id="stockInput" type="text" placeholder="台股代號 2330 或美股 AAPL" maxlength="10"
+    onkeydown="if(event.key==='Enter') analyze()" oninput="detectMarket()">
   <button id="searchBtn" onclick="analyze()">分析</button>
 </div>
-<div class="quick-btns">
-  <button class="quick-btn" onclick="quickSearch('2330')">2330 台積電</button>
-  <button class="quick-btn" onclick="quickSearch('2317')">2317 鴻海</button>
-  <button class="quick-btn" onclick="quickSearch('2454')">2454 聯發科</button>
-  <button class="quick-btn" onclick="quickSearch('2412')">2412 中華電</button>
-  <button class="quick-btn" onclick="quickSearch('0050')">0050 元大台灣50</button>
+
+<div class="market-tabs">
+  <span id="tab-tw" class="tab-label tw">🇹🇼 台股</span>
+  <span id="tab-us" class="tab-label us">🇺🇸 美股</span>
 </div>
+
+<div class="quick-group">
+  <div class="quick-group-label">🇹🇼 台股</div>
+  <div class="quick-btns">
+    <button class="quick-btn tw" onclick="quickSearch('2330')">2330 台積電</button>
+    <button class="quick-btn tw" onclick="quickSearch('2317')">2317 鴻海</button>
+    <button class="quick-btn tw" onclick="quickSearch('2454')">2454 聯發科</button>
+    <button class="quick-btn tw" onclick="quickSearch('2412')">2412 中華電</button>
+    <button class="quick-btn tw" onclick="quickSearch('0050')">0050 元大50</button>
+  </div>
+</div>
+<div class="quick-group">
+  <div class="quick-group-label">🇺🇸 美股</div>
+  <div class="quick-btns">
+    <button class="quick-btn us" onclick="quickSearch('AAPL')">AAPL 蘋果</button>
+    <button class="quick-btn us" onclick="quickSearch('NVDA')">NVDA 輝達</button>
+    <button class="quick-btn us" onclick="quickSearch('MSFT')">MSFT 微軟</button>
+    <button class="quick-btn us" onclick="quickSearch('SPY')">SPY 標普500</button>
+    <button class="quick-btn us" onclick="quickSearch('QQQ')">QQQ 那斯達克</button>
+  </div>
+</div>
+
 <div id="result"></div>
+
 <footer>
-  資料來源：FinMind｜AI 分析：Claude (Anthropic)｜本工具僅供參考，不構成投資建議<br>
-  指標：MA20/60/120/240・MACD・月KD・RSI・本益比・殖利率
+  台股資料：FinMind｜美股資料：Yahoo Finance｜AI 分析：Claude (Anthropic)<br>
+  指標：MA20/60/120/240・MACD・月KD・RSI・本益比・殖利率｜僅供參考，不構成投資建議
 </footer>
 
 <script>
 let priceChart=null, macdChart=null;
-function quickSearch(id){document.getElementById('stockInput').value=id;analyze();}
 
-async function analyze(){
-  const sid=document.getElementById('stockInput').value.trim();
-  if(!sid)return;
-  const btn=document.getElementById('searchBtn'),result=document.getElementById('result');
-  btn.disabled=true;btn.textContent='分析中…';
+function detectMarket() {
+  const val = document.getElementById('stockInput').value.trim();
+  const isTW = /^\d/.test(val);
+  const isUS = /^[A-Za-z]/.test(val);
+  document.getElementById('tab-tw').className = 'tab-label tw' + (isTW ? ' active-tw' : '');
+  document.getElementById('tab-us').className = 'tab-label us' + (isUS ? ' active-us' : '');
+}
+
+function quickSearch(id) { document.getElementById('stockInput').value=id; detectMarket(); analyze(); }
+
+function isUSStock(input) { return /^[A-Za-z]/.test(input.trim()); }
+
+async function analyze() {
+  const raw = document.getElementById('stockInput').value.trim();
+  if (!raw) return;
+  const btn = document.getElementById('searchBtn'), result = document.getElementById('result');
+  btn.disabled=true; btn.textContent='分析中…';
   result.innerHTML='<div class="loading">正在取得市場資料</div>';
   if(priceChart){priceChart.destroy();priceChart=null;}
   if(macdChart){macdChart.destroy();macdChart=null;}
-  try{
-    const res=await fetch(`/api/analyze?stock_id=${encodeURIComponent(sid)}`);
-    const data=await res.json();
-    if(!res.ok)throw new Error(data.error||'查詢失敗');
+  try {
+    const us = isUSStock(raw);
+    const endpoint = us ? `/api/us-analyze?symbol=${encodeURIComponent(raw.toUpperCase())}`
+                       : `/api/analyze?stock_id=${encodeURIComponent(raw)}`;
+    const res = await fetch(endpoint);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '查詢失敗');
     renderResult(data);
-    // 非同步載入 AI 分析
     fetchAIZone(data);
-  }catch(e){
+  } catch(e) {
     result.innerHTML=`<div class="error-msg">⚠️ ${e.message}</div>`;
-  }finally{btn.disabled=false;btn.textContent='分析';}
+  } finally { btn.disabled=false; btn.textContent='分析'; }
 }
 
-async function fetchAIZone(data){
-  const el=document.getElementById('ai-zone-placeholder');
-  if(!el)return;
-  try{
-    const res=await fetch('/api/ai-zone',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(data),
+async function fetchAIZone(data) {
+  const el = document.getElementById('ai-zone-placeholder');
+  if (!el) return;
+  try {
+    const res = await fetch('/api/ai-zone', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data),
     });
-    const bz=await res.json();
-    if(!res.ok)throw new Error(bz.error||'AI 分析失敗');
-    el.outerHTML=renderBuyZoneHTML(bz, data.price?.close);
-  }catch(e){
-    if(el)el.innerHTML=`<div style="color:var(--text2);font-size:12px;padding:8px 0">AI 分析暫時無法取得：${e.message}</div>`;
+    const bz = await res.json();
+    if (!res.ok) throw new Error(bz.error||'AI 分析失敗');
+    el.outerHTML = renderBuyZoneHTML(bz);
+  } catch(e) {
+    if(el) el.innerHTML=`<div style="color:var(--text2);font-size:12px;padding:8px 0">AI 分析暫時無法取得：${e.message}</div>`;
   }
 }
 
-const fmt=(n,d=2)=>n==null?'—':Number(n).toLocaleString('zh-TW',{minimumFractionDigits:d,maximumFractionDigits:d});
-const fmtVol=v=>{if(!v)return'—';if(v>=1e8)return(v/1e8).toFixed(1)+' 億';if(v>=1e4)return(v/1e4).toFixed(1)+' 萬';return v.toLocaleString();};
+const fmt=(n,d=2)=>n==null?'—':Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+const fmtVol=v=>{if(!v)return'—';if(v>=1e9)return(v/1e9).toFixed(1)+'B';if(v>=1e6)return(v/1e6).toFixed(1)+'M';if(v>=1e4)return(v/1e4).toFixed(1)+'萬';return v.toLocaleString();};
 
-function renderBuyZoneHTML(bz,price){
+function renderBuyZoneHTML(bz) {
   const eqClass={excellent:'eq-excellent',good:'eq-good',fair:'eq-fair',poor:'eq-poor'}[bz.entry_quality]||'eq-fair';
   const riskClass={low:'risk-low',medium:'risk-medium',high:'risk-high'}[bz.risk]||'risk-medium';
   const riskLabel={low:'低風險',medium:'中等風險',high:'較高風險'}[bz.risk]||'';
@@ -192,49 +241,47 @@ function renderBuyZoneHTML(bz,price){
   </div>`;
 }
 
-function renderResult(d){
-  const p=d.price,ind=d.indicators,sig=d.signal;
-  const cc=p.change_percent>0?'up':p.change_percent<0?'down':'flat';
-  const cs=p.change_percent>0?'+':'';
-  const sigCC={bullish:'bullish',bearish:'bearish',neutral:'neutral'}[sig.overall];
-  const sigColor={bullish:'var(--red)',bearish:'var(--green)',neutral:'var(--yellow)'}[sig.overall];
-  const maTags=(ind.ma_position||[]).map(t=>`<span class="ma-tag ${t.includes('站上')?'above':'below'}">${t}</span>`).join('');
-  const macdColor=ind.macd_hist>0?'var(--red)':'var(--green)';
-  const monthKColor=ind.month_k<30?'var(--accent)':ind.month_k>70?'var(--red)':'var(--text)';
+function renderResult(d) {
+  const p=d.price, ind=d.indicators, sig=d.signal;
+  const isUS = d.market === 'us';
+  const currency = d.currency || (isUS ? 'USD' : 'TWD');
 
-  let valHtml='';
-  if(d.valuation){
-    const v=d.valuation;
+  // 美股漲=綠，台股漲=紅
+  const upClass = isUS ? 'us-up' : 'up';
+  const downClass = isUS ? 'us-down' : 'down';
+  const cc = p.change_percent > 0 ? upClass : p.change_percent < 0 ? downClass : 'flat';
+  const cs = p.change_percent > 0 ? '+' : '';
+
+  const sigColor = {bullish:'var(--accent)', bearish:'var(--text2)', neutral:'var(--yellow)'}[sig.overall];
+  const maTags = (ind.ma_position||[]).map(t=>`<span class="ma-tag ${t.includes('站上')?'above':'below'}">${t}</span>`).join('');
+  const macdColor = ind.macd_hist > 0 ? 'var(--accent)' : 'var(--text2)';
+  const monthKColor = ind.month_k < 30 ? 'var(--accent)' : ind.month_k > 70 ? 'var(--yellow)' : 'var(--text)';
+
+  let valHtml = '';
+  if (d.valuation && (d.valuation.per || d.valuation.yield)) {
+    const v = d.valuation;
     valHtml=`<div class="card">
       <div class="section-title">估值指標（${v.date||''}）</div>
       <div class="val-grid">
         <div class="val-item"><label>本益比 P/E</label><span>${v.per!=null?v.per+'x':'—'}</span></div>
-        <div class="val-item"><label>股價淨值比 P/B</label><span>${v.pbr!=null?v.pbr+'x':'—'}</span></div>
+        ${v.pbr!=null?`<div class="val-item"><label>股價淨值比 P/B</label><span>${v.pbr}x</span></div>`:''}
         <div class="val-item"><label>殖利率</label><span>${v.yield!=null?v.yield+'%':'—'}</span></div>
-      </div></div>`;
-  }
-
-  let revHtml='';
-  if(d.monthly_revenue){
-    const r=d.monthly_revenue;
-    revHtml=`<div class="card">
-      <div class="section-title">月營收（${r.date.slice(0,7)}）</div>
-      <div class="rev-grid">
-        <div class="rev-item"><label>當月營收</label><span>${fmtVol(r.revenue)}</span></div>
-        <div class="rev-item"><label>年增率 YoY</label><span class="${r.yoy>0?'up':r.yoy<0?'down':''}">${r.yoy!=null?(r.yoy>0?'+':'')+fmt(r.yoy)+'%':'—'}</span></div>
-        <div class="rev-item"><label>月增率 MoM</label><span class="${r.mom>0?'up':r.mom<0?'down':''}">${r.mom!=null?(r.mom>0?'+':'')+fmt(r.mom)+'%':'—'}</span></div>
       </div></div>`;
   }
 
   document.getElementById('result').innerHTML=`
     <div class="card">
-      <div class="price-header"><span class="stock-name">${d.name}</span><span class="stock-id">${d.stock_id}</span></div>
-      <div class="price-main ${cc}">${fmt(p.close)}</div>
+      <div class="price-header">
+        <span class="stock-name">${d.name}</span>
+        <span class="stock-id">${d.stock_id}</span>
+        <span class="market-badge ${isUS?'us':'tw'}">${isUS?'🇺🇸 美股':'🇹🇼 台股'}</span>
+      </div>
+      <div class="price-main ${cc}">${fmt(p.close)}<span class="currency-tag">${currency}</span></div>
       <div class="price-change ${cc}">${p.change_percent!=null?cs+fmt(p.change_percent)+'%':''}</div>
       <div class="price-meta">
         <div class="meta-item"><label>開盤</label><span>${fmt(p.open)}</span></div>
-        <div class="meta-item"><label>最高</label><span class="up">${fmt(p.high)}</span></div>
-        <div class="meta-item"><label>最低</label><span class="down">${fmt(p.low)}</span></div>
+        <div class="meta-item"><label>最高</label><span class="${upClass}">${fmt(p.high)}</span></div>
+        <div class="meta-item"><label>最低</label><span class="${downClass}">${fmt(p.low)}</span></div>
         <div class="meta-item"><label>成交量</label><span>${fmtVol(p.volume)}</span></div>
         <div class="meta-item"><label>52週高</label><span>${fmt(ind.high_52w)}</span></div>
         <div class="meta-item"><label>52週低</label><span>${fmt(ind.low_52w)}</span></div>
@@ -255,26 +302,22 @@ function renderResult(d){
       <div class="ind-grid">
         <div class="ind-item"><label>MACD 柱狀</label><span style="color:${macdColor}">${fmt(ind.macd_hist)}</span><div class="sub">DIF ${fmt(ind.macd_line)} / DEA ${fmt(ind.macd_signal)}</div></div>
         <div class="ind-item"><label>月 KD</label><span style="color:${monthKColor}">K ${fmt(ind.month_k,1)}</span><div class="sub">D ${fmt(ind.month_d,1)}</div></div>
-        <div class="ind-item"><label>RSI(14)</label><span style="color:${ind.rsi<40?'var(--accent)':ind.rsi>70?'var(--red)':'var(--text)'}">${fmt(ind.rsi)}</span></div>
+        <div class="ind-item"><label>RSI(14)</label><span style="color:${ind.rsi<40?'var(--accent)':ind.rsi>70?'var(--yellow)':'var(--text)'}">${fmt(ind.rsi)}</span></div>
       </div>
     </div>
-    <div class="card signal-card ${sigCC}">
+    <div class="card signal-card ${sig.overall}">
       <div class="section-title">中長期綜合訊號</div>
       <div class="signal-score"><span class="score-bull">多方 ${sig.bullScore}</span><span class="score-bear">空方 ${sig.bearScore}</span></div>
       <div class="signal-summary" style="color:${sigColor}">${sig.summary}</div>
       <div class="signal-items">${sig.signals.map(s=>`<div class="signal-item sig-${s.type}"><span class="signal-dot"></span><span>${s.text}</span></div>`).join('')}</div>
     </div>
-
-    <!-- AI 佔位符：非同步填入 -->
     <div class="buy-zone-card" id="ai-zone-placeholder">
       <div class="bz-header"><span class="ai-badge">AI</span><span class="bz-title">中長期買入評估</span></div>
       <div class="ai-loading">Claude 正在分析買入時機…</div>
     </div>
-
     ${valHtml}
-    <div class="card"><div class="section-title">近60日走勢（含均線）</div><div class="chart-area"><canvas id="priceChart"></canvas></div></div>
+    <div class="card"><div class="section-title">近60日走勢</div><div class="chart-area"><canvas id="priceChart"></canvas></div></div>
     <div class="card"><div class="section-title">MACD</div><div class="chart-area small"><canvas id="macdChart"></canvas></div></div>
-    ${revHtml}
     <div class="updated-tag">資料日期：${d.updated}</div>`;
 
   loadChartJS(()=>{drawPriceChart(d.history);drawMacdChart(d.history);});
@@ -294,12 +337,11 @@ function drawPriceChart(h){
     plugins:{legend:{labels:{color:'#94a3b8',font:{size:10},boxWidth:12,padding:10}},tooltip:{backgroundColor:'#1a2235',borderColor:'#1e2d45',borderWidth:1,titleColor:'#94a3b8',bodyColor:'#e2e8f0'}},
     scales:{x:{ticks:{color:'#94a3b8',font:{size:10},maxTicksLimit:8},grid:{color:'rgba(255,255,255,.04)'}},y:{position:'right',ticks:{color:'#94a3b8',font:{size:10,family:'JetBrains Mono'}},grid:{color:'rgba(255,255,255,.04)'}}}}});
 }
-
 function drawMacdChart(h){
   const ctx=document.getElementById('macdChart');if(!ctx)return;
   const labels=h.map(d=>d.date.slice(5));
   macdChart=new Chart(ctx,{type:'bar',data:{labels,datasets:[
-    {label:'MACD柱',data:h.map(d=>d.macd_hist),backgroundColor:h.map(d=>(d.macd_hist||0)>0?'rgba(255,23,68,.6)':'rgba(0,230,118,.6)'),borderWidth:0},
+    {label:'MACD柱',data:h.map(d=>d.macd_hist),backgroundColor:h.map(d=>(d.macd_hist||0)>0?'rgba(0,212,255,.5)':'rgba(148,163,184,.4)'),borderWidth:0},
     {label:'DIF',data:h.map(d=>d.macd),type:'line',borderColor:'#00d4ff',borderWidth:1.5,fill:false,pointRadius:0,tension:.3},
     {label:'DEA',data:h.map(d=>d.macd_signal),type:'line',borderColor:'#ffd740',borderWidth:1.5,fill:false,pointRadius:0,tension:.3},
   ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
