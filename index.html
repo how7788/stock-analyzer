@@ -11,20 +11,26 @@ body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e2e8f0;
 h1 { color: #60a5fa; font-size: 22px; font-weight: 700; margin-bottom: 4px; }
 .sub { color: #64748b; font-size: 13px; margin-bottom: 20px; }
 .tags { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
-.tag { padding: 5px 13px; border-radius: 20px; background: #1e293b; border: 1px solid #334155; color: #94a3b8; font-size: 12px; cursor: pointer; }
-.tag:hover { border-color: #60a5fa; color: #60a5fa; }
+.tag { padding: 5px 13px; border-radius: 20px; background: #1e293b; border: 1px solid #334155; color: #94a3b8; font-size: 12px; cursor: pointer; transition: all 0.2s; }
+.tag:hover, .tag.active { border-color: #60a5fa; color: #60a5fa; background: #1e3a5f; }
 .input-row { display: flex; gap: 10px; margin-bottom: 10px; }
 input { flex: 1; padding: 12px 16px; border-radius: 10px; border: 1.5px solid #334155; background: #1e293b; color: #e2e8f0; font-size: 15px; outline: none; }
 input:focus { border-color: #60a5fa; }
-button { padding: 12px 22px; border-radius: 10px; background: #2563eb; color: white; border: none; font-size: 15px; font-weight: 600; cursor: pointer; white-space: nowrap; }
-button:disabled { background: #1e293b; color: #64748b; cursor: not-allowed; }
+button#btn { padding: 12px 22px; border-radius: 10px; background: #2563eb; color: white; border: none; font-size: 15px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+button#btn:disabled { background: #1e293b; color: #64748b; cursor: not-allowed; }
 .progress-wrap { margin-bottom: 14px; display: none; }
 .progress-label { color: #93c5fd; font-size: 13px; margin-bottom: 6px; }
 .progress-bar { background: #1e293b; border-radius: 6px; height: 6px; }
 .progress-fill { background: #2563eb; height: 100%; border-radius: 6px; transition: width 0.5s ease; width: 0%; }
 .result { background: #1e293b; border-radius: 12px; padding: 22px; border: 1px solid #334155; min-height: 160px; font-size: 13.5px; line-height: 1.85; }
-.placeholder { color: #334155; text-align: center; padding-top: 48px; }
-.error { color: #f87171; }
+.placeholder { color: #475569; padding: 20px 0; }
+.placeholder h3 { color: #60a5fa; font-size: 15px; margin-bottom: 12px; }
+.placeholder ul { list-style: none; padding: 0; }
+.placeholder ul li { padding: 4px 0; color: #64748b; font-size: 13px; }
+.placeholder ul li::before { content: "📌 "; }
+.disclaimer { margin-top: 16px; padding: 10px 14px; background: #162032; border-radius: 8px; color: #64748b; font-size: 12px; border-left: 3px solid #334155; }
+.error { color: #f87171; background: #1e293b; border-radius: 8px; padding: 12px 16px; }
+.error-hint { color: #94a3b8; font-size: 12px; margin-top: 8px; }
 h2 { color: #60a5fa; font-size: 16px; font-weight: 700; margin-top: 20px; margin-bottom: 6px; border-bottom: 1px solid #1e3a5f; padding-bottom: 4px; }
 h3 { color: #93c5fd; font-size: 14px; font-weight: 700; margin-top: 14px; margin-bottom: 4px; }
 strong { color: #f8fafc; }
@@ -32,38 +38,70 @@ hr { border: none; border-top: 1px solid #334155; margin: 12px 0; }
 table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 13px; }
 td, th { padding: 6px 10px; border: 1px solid #334155; color: #e2e8f0; }
 tr:nth-child(even) td { background: #162032; }
+.meta-bar { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; padding: 10px 14px; background: #162032; border-radius: 8px; font-size: 12px; color: #64748b; }
+.meta-bar span { color: #94a3b8; }
 </style>
 </head>
 <body>
 <div class="container">
   <h1>📊 股票深度分析</h1>
-  <p class="sub">輸入代碼或名稱，搜尋最新數據，產生完整八大面向分析報告</p>
+  <p class="sub">輸入代碼或名稱，產生完整八大面向分析報告</p>
+
   <div class="tags">
-    <span class="tag" onclick="setStock('2330 台積電')">2330 台積電</span>
-    <span class="tag" onclick="setStock('2317 鴻海')">2317 鴻海</span>
-    <span class="tag" onclick="setStock('2454 聯發科')">2454 聯發科</span>
-    <span class="tag" onclick="setStock('NVDA 輝達')">NVDA 輝達</span>
-    <span class="tag" onclick="setStock('AAPL 蘋果')">AAPL 蘋果</span>
+    <span class="tag" onclick="setStock('2330 台積電', this)">2330 台積電</span>
+    <span class="tag" onclick="setStock('2317 鴻海', this)">2317 鴻海</span>
+    <span class="tag" onclick="setStock('2454 聯發科', this)">2454 聯發科</span>
+    <span class="tag" onclick="setStock('NVDA 輝達', this)">NVDA 輝達</span>
+    <span class="tag" onclick="setStock('AAPL 蘋果', this)">AAPL 蘋果</span>
   </div>
+
   <div class="input-row">
     <input id="stockInput" type="text" placeholder="輸入股票代碼或名稱，例如：2330、台積電、NVDA" />
     <button id="btn" onclick="analyze()">分析</button>
   </div>
+
   <div class="progress-wrap" id="progressWrap">
     <div class="progress-label" id="progressLabel">分析中...</div>
     <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
   </div>
+
   <div class="result" id="result">
-    <div class="placeholder">輸入股票後按「分析」開始</div>
+    <div class="placeholder">
+      <h3>輸入股票代碼後，系統將分析：</h3>
+      <ul>
+        <li>基本資料與近期股價（含即時數據）</li>
+        <li>近 3～5 年 PER / PBR 歷史估值區間</li>
+        <li>20～60 倍 PER 估值對照表</li>
+        <li>便宜價、合理觀察價、過熱價三個區間</li>
+        <li>三大法人、融資、成交量、均線籌碼面</li>
+        <li>市場給高本益比的原因分析</li>
+        <li>樂觀 / 中性 / 悲觀多空情境表</li>
+        <li>明確投資結論與建議操作策略</li>
+      </ul>
+      <div class="disclaimer">⚠️ 本工具僅供研究參考，不構成投資建議。股市有風險，投資需謹慎。</div>
+    </div>
   </div>
 </div>
+
 <script>
-function setStock(s) { document.getElementById('stockInput').value = s; }
+let activeTag = null;
+
+function setStock(s, el) {
+  document.getElementById('stockInput').value = s;
+  if (activeTag) activeTag.classList.remove('active');
+  el.classList.add('active');
+  activeTag = el;
+}
+
 function setProgress(pct, label) {
   document.getElementById('progressFill').style.width = pct + '%';
   document.getElementById('progressLabel').textContent = label;
 }
+
 function renderMd(text) {
+  // 先移除 <br> 標籤
+  text = text.replace(/<br\s*\/?>/gi, '\n');
+  
   let html = text
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/^# (.+)$/gm,'<h2>$1</h2>')
@@ -71,6 +109,7 @@ function renderMd(text) {
     .replace(/^### (.+)$/gm,'<h3>$1</h3>')
     .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
     .replace(/^---$/gm,'<hr>');
+
   const lines = html.split('\n');
   let out = '', inTable = false, tableHtml = '';
   for (const line of lines) {
@@ -87,6 +126,7 @@ function renderMd(text) {
   if (inTable) out += tableHtml + '</table>';
   return out.replace(/\n/g,'<br>');
 }
+
 async function callAPI(prompt) {
   const res = await fetch('/api/analyze', {
     method: 'POST',
@@ -96,34 +136,86 @@ async function callAPI(prompt) {
   const data = await res.json();
   return data.text || '';
 }
+
 async function analyze() {
   const stock = document.getElementById('stockInput').value.trim();
   if (!stock) return;
-  document.getElementById('btn').disabled = true;
+
+  const btn = document.getElementById('btn');
+  btn.disabled = true;
   document.getElementById('progressWrap').style.display = 'block';
   document.getElementById('result').innerHTML = '';
+  const updateTime = new Date().toLocaleString('zh-TW');
+
   try {
     let fullText = '';
+
     setProgress(5, '🔍 搜尋基本資料與估值歷史...');
-    const t1 = await callAPI(`請搜尋「${stock}」最新股價與財務資料，用繁體中文回答：\n## 一、基本資料與近期股價\n列出現價、52週高低、市值、近四季EPS、2026預估EPS，標明來源與日期。\n## 二、近3～5年 PER、PBR 歷史區間\n用表格列出每年高低點PER與PBR，說明目前估值在歷史高/中/低哪個位置。`);
-    fullText += t1; document.getElementById('result').innerHTML = renderMd(fullText);
+    const t1 = await callAPI(`請根據提供的即時股價數據，針對「${stock}」用繁體中文回答：
+## 一、基本資料與近期股價
+列出現價、52週高低、市值、近四季EPS、2026預估EPS，標明資料來源與日期。
+## 二、近3～5年 PER、PBR 歷史區間
+用表格列出每年高低點PER與PBR，說明目前估值在歷史高/中/低哪個位置。`);
+    fullText += t1;
+    document.getElementById('result').innerHTML = renderMd(fullText);
     setProgress(28, '💰 計算估值區間...');
-    const t2 = await callAPI(`針對「${stock}」用繁體中文回答：\n## 三、PER 估值對照表\n用表格列出近四季EPS合計與2026預估EPS，分別乘以20/30/40/50/60倍對應股價。\n## 四、便宜價、合理觀察價、過熱價\n明確給出三個具體價格區間與判斷依據。`);
-    fullText += '\n\n' + t2; document.getElementById('result').innerHTML = renderMd(fullText);
+
+    const t2 = await callAPI(`針對「${stock}」用繁體中文回答：
+## 三、PER 估值對照表
+用表格列出近四季EPS合計與2026預估EPS，分別乘以20/30/40/50/60倍對應股價。
+## 四、便宜價、合理觀察價、過熱價
+明確給出三個具體價格區間與判斷依據（請勿在表格內使用 HTML 標籤）。`);
+    fullText += '\n\n' + t2;
+    document.getElementById('result').innerHTML = renderMd(fullText);
     setProgress(52, '📈 搜尋籌碼與技術面數據...');
-    const t3 = await callAPI(`請搜尋「${stock}」最新籌碼資料，用繁體中文回答：\n## 五、籌碼與技術面判斷\n三大法人近5日買賣超、融資餘額變化、近期日均量、5MA/10MA/20MA/60MA乖離率，給出多空判斷。\n## 六、市場給高本益比的原因\n說明3～5個主要理由，分析利多是否已反映股價。`);
-    fullText += '\n\n' + t3; document.getElementById('result').innerHTML = renderMd(fullText);
+
+    const t3 = await callAPI(`針對「${stock}」用繁體中文回答：
+## 五、籌碼與技術面判斷
+三大法人近5日買賣超、融資餘額變化、近期日均量、5MA/10MA/20MA/60MA乖離率，給出多空判斷。
+## 六、市場給高本益比的原因
+說明3～5個主要理由，分析利多是否已反映股價。`);
+    fullText += '\n\n' + t3;
+    document.getElementById('result').innerHTML = renderMd(fullText);
     setProgress(76, '🎯 生成多空情境與結論...');
-    const t4 = await callAPI(`針對「${stock}」用繁體中文回答：\n## 七、多空情境表\n用表格列出樂觀/中性/悲觀三種情境與對應合理價。\n## 八、明確投資結論\n直接回答：現在是否適合買？適合追高嗎？什麼價位值得重新評估？建議操作策略。`);
-    fullText += '\n\n' + t4; document.getElementById('result').innerHTML = renderMd(fullText);
+
+    const t4 = await callAPI(`針對「${stock}」用繁體中文回答：
+## 七、多空情境表
+用表格列出樂觀/中性/悲觀三種情境與對應合理價。
+## 八、明確投資結論
+直接回答：現在是否適合買？適合追高嗎？什麼價位值得重新評估？建議操作策略。`);
+    fullText += '\n\n' + t4;
+
+    // 加上資料來源與免責聲明
+    const footer = `\n\n---\n**資料來源：** Yahoo Finance（即時股價）、AI 分析（財務估值）｜**更新時間：** ${updateTime}｜**注意：** 本分析僅供研究參考，不構成投資建議，投資人應自行判斷風險。`;
+    fullText += footer;
+
+    document.getElementById('result').innerHTML = renderMd(fullText);
     setProgress(100, '✅ 分析完成');
+
   } catch(e) {
-    document.getElementById('result').innerHTML = `<div class="error">❌ 錯誤：${e.message}</div>`;
+    const isInvalidStock = e.message?.includes('404') || e.message?.includes('not found');
+    document.getElementById('result').innerHTML = `
+      <div class="error">
+        ❌ 查無此股票或發生錯誤
+        <div class="error-hint">
+          請嘗試：<br>
+          • 台股代碼：2330、2317、2454<br>
+          • 美股代碼：NVDA、AAPL、TSLA<br>
+          • 公司名稱：台積電、鴻海、聯發科
+        </div>
+      </div>`;
   }
-  document.getElementById('btn').disabled = false;
-  setTimeout(() => { document.getElementById('progressWrap').style.display = 'none'; }, 2000);
+
+  // 一定要在這裡恢復按鈕
+  btn.disabled = false;
+  setTimeout(() => {
+    document.getElementById('progressWrap').style.display = 'none';
+  }, 1500);
 }
-document.getElementById('stockInput').addEventListener('keydown', e => { if(e.key==='Enter') analyze(); });
+
+document.getElementById('stockInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') analyze();
+});
 </script>
 </body>
 </html>
