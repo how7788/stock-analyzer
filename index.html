@@ -3,237 +3,133 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>台股分析儀</title>
+<title>台股分析儀｜中長期</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;600&display=swap');
-
   :root {
-    --bg: #0a0e1a;
-    --bg2: #111827;
-    --bg3: #1a2235;
-    --border: #1e2d45;
-    --accent: #00d4ff;
-    --accent2: #0066ff;
-    --green: #00e676;
-    --red: #ff1744;
-    --yellow: #ffd740;
-    --text: #e2e8f0;
-    --text2: #94a3b8;
-    --radius: 12px;
+    --bg:#0a0e1a; --bg2:#111827; --bg3:#1a2235; --border:#1e2d45;
+    --accent:#00d4ff; --accent2:#0066ff;
+    --green:#00e676; --red:#ff1744; --yellow:#ffd740; --orange:#ff9100;
+    --text:#e2e8f0; --text2:#94a3b8; --radius:12px;
   }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Noto Sans TC',sans-serif;min-height:100vh;padding:24px 16px;}
+  .header{text-align:center;margin-bottom:32px;}
+  .header h1{font-size:clamp(22px,4vw,32px);font-weight:700;letter-spacing:2px;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+  .header p{color:var(--text2);font-size:13px;margin-top:6px;}
+  .search-box{display:flex;gap:10px;max-width:480px;margin:0 auto 24px;}
+  .search-box input{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px 16px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:16px;outline:none;transition:border-color .2s;}
+  .search-box input:focus{border-color:var(--accent);}
+  .search-box input::placeholder{color:var(--text2);}
+  .search-box button{background:linear-gradient(135deg,var(--accent2),var(--accent));border:none;border-radius:8px;padding:12px 24px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .2s;white-space:nowrap;}
+  .search-box button:hover{opacity:.85;}
+  .search-box button:disabled{opacity:.5;cursor:not-allowed;}
+  .quick-btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:32px;}
+  .quick-btn{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:6px 14px;color:var(--text2);font-size:13px;font-family:'JetBrains Mono',monospace;cursor:pointer;transition:all .2s;}
+  .quick-btn:hover{border-color:var(--accent);color:var(--accent);}
+  #result{max-width:960px;margin:0 auto;}
+  .loading{text-align:center;padding:48px;color:var(--text2);font-size:14px;}
+  .loading::after{content:'';display:block;width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;margin:16px auto 0;animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .error-msg{background:rgba(255,23,68,.08);border:1px solid rgba(255,23,68,.3);border-radius:var(--radius);padding:16px 20px;color:var(--red);text-align:center;}
+  .card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;}
+  .section-title{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;}
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  /* 股價主卡 */
+  .price-header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:4px;}
+  .stock-name{font-size:22px;font-weight:700;}
+  .stock-id{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text2);background:var(--bg3);padding:2px 8px;border-radius:4px;}
+  .price-main{font-family:'JetBrains Mono',monospace;font-size:clamp(28px,5vw,42px);font-weight:600;line-height:1;margin:6px 0;}
+  .price-change{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:500;}
+  .up{color:var(--red);} .down{color:var(--green);} .flat{color:var(--text2);}
+  .price-meta{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);}
+  .meta-item label{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:3px;}
+  .meta-item span{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:500;}
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Noto Sans TC', sans-serif;
-    min-height: 100vh;
-    padding: 24px 16px;
-  }
+  /* 指標格 */
+  .ind-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;}
+  .ind-item{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px;}
+  .ind-item label{font-size:10px;color:var(--text2);display:block;margin-bottom:5px;}
+  .ind-item span{font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:600;}
+  .ind-item .sub{font-size:10px;color:var(--text2);margin-top:3px;}
 
-  .header { text-align: center; margin-bottom: 32px; }
-  .header h1 {
-    font-size: clamp(22px, 4vw, 32px);
-    font-weight: 700;
-    letter-spacing: 2px;
-    background: linear-gradient(90deg, var(--accent), var(--accent2));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-  .header p { color: var(--text2); font-size: 13px; margin-top: 6px; }
+  /* 均線位置條 */
+  .ma-position{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;}
+  .ma-tag{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600;}
+  .ma-tag.above{background:rgba(255,23,68,.12);color:var(--red);border:1px solid rgba(255,23,68,.25);}
+  .ma-tag.below{background:rgba(0,230,118,.12);color:var(--green);border:1px solid rgba(0,230,118,.25);}
 
-  .search-box {
-    display: flex; gap: 10px;
-    max-width: 480px; margin: 0 auto 32px;
-  }
-  .search-box input {
-    flex: 1;
-    background: var(--bg3); border: 1px solid var(--border);
-    border-radius: 8px; padding: 12px 16px;
-    color: var(--text); font-family: 'JetBrains Mono', monospace;
-    font-size: 16px; outline: none; transition: border-color .2s;
-  }
-  .search-box input:focus { border-color: var(--accent); }
-  .search-box input::placeholder { color: var(--text2); }
-  .search-box button {
-    background: linear-gradient(135deg, var(--accent2), var(--accent));
-    border: none; border-radius: 8px; padding: 12px 24px;
-    color: #fff; font-size: 15px; font-weight: 600;
-    cursor: pointer; transition: opacity .2s; white-space: nowrap;
-  }
-  .search-box button:hover { opacity: .85; }
-  .search-box button:disabled { opacity: .5; cursor: not-allowed; }
+  /* MACD 小圖 */
+  .macd-chart{height:80px;margin-top:8px;}
 
-  .quick-btns {
-    display: flex; gap: 8px; justify-content: center;
-    flex-wrap: wrap; margin-bottom: 32px;
-  }
-  .quick-btn {
-    background: var(--bg3); border: 1px solid var(--border);
-    border-radius: 6px; padding: 6px 14px; color: var(--text2);
-    font-size: 13px; font-family: 'JetBrains Mono', monospace;
-    cursor: pointer; transition: all .2s;
-  }
-  .quick-btn:hover { border-color: var(--accent); color: var(--accent); }
+  /* 訊號卡 */
+  .signal-card{border-left:4px solid var(--accent);}
+  .signal-card.bullish{border-left-color:var(--red);}
+  .signal-card.bearish{border-left-color:var(--green);}
+  .signal-card.neutral{border-left-color:var(--yellow);}
+  .signal-score{display:flex;gap:12px;margin-bottom:10px;}
+  .score-bull{font-size:13px;color:var(--red);font-weight:600;}
+  .score-bear{font-size:13px;color:var(--green);font-weight:600;}
+  .signal-summary{font-size:18px;font-weight:700;margin-bottom:12px;}
+  .signal-items{display:flex;flex-direction:column;gap:6px;}
+  .signal-item{display:flex;align-items:flex-start;gap:8px;font-size:13px;}
+  .signal-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px;}
+  .sig-bullish .signal-dot{background:var(--red);}
+  .sig-bearish .signal-dot{background:var(--green);}
+  .sig-neutral .signal-dot{background:var(--yellow);}
 
-  #result { max-width: 900px; margin: 0 auto; }
+  /* 估值卡 */
+  .val-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;}
+  .val-item{background:var(--bg3);border-radius:8px;padding:12px;border:1px solid var(--border);}
+  .val-item label{font-size:10px;color:var(--text2);display:block;margin-bottom:4px;}
+  .val-item span{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:600;}
 
-  .loading {
-    text-align: center; padding: 48px;
-    color: var(--text2); font-size: 14px;
-  }
-  .loading::after {
-    content: ''; display: block;
-    width: 32px; height: 32px;
-    border: 3px solid var(--border); border-top-color: var(--accent);
-    border-radius: 50%; margin: 16px auto 0;
-    animation: spin .8s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  /* AI 買入區間卡 */
+  .buy-zone-card{background:var(--bg2);border:1px solid rgba(0,212,255,.2);border-radius:var(--radius);padding:20px;margin-bottom:16px;position:relative;overflow:hidden;}
+  .buy-zone-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent2),var(--accent));}
+  .bz-header{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+  .ai-badge{background:linear-gradient(135deg,var(--accent2),var(--accent));color:#fff;font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px;letter-spacing:1px;}
+  .bz-title{font-size:14px;color:var(--text2);}
+  .entry-quality{font-size:13px;font-weight:700;padding:3px 12px;border-radius:20px;}
+  .eq-excellent{background:rgba(255,23,68,.15);color:var(--red);border:1px solid rgba(255,23,68,.3);}
+  .eq-good{background:rgba(0,212,255,.12);color:var(--accent);border:1px solid rgba(0,212,255,.25);}
+  .eq-fair{background:rgba(255,215,64,.12);color:var(--yellow);border:1px solid rgba(255,215,64,.25);}
+  .eq-poor{background:rgba(0,230,118,.12);color:var(--green);border:1px solid rgba(0,230,118,.25);}
+  .bz-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:14px;}
+  .bz-item{background:var(--bg3);border-radius:8px;padding:12px;border:1px solid var(--border);}
+  .bz-item label{font-size:10px;color:var(--text2);display:block;margin-bottom:5px;}
+  .bz-item span{font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:700;}
+  .bz-item.buy span{color:var(--accent);}
+  .bz-item.stop span{color:var(--red);}
+  .bz-item.t6 span{color:#a8edea;}
+  .bz-item.t12 span{color:var(--green);}
+  .bz-strategy{font-size:13px;color:var(--text);line-height:1.7;padding:12px 14px;background:var(--bg3);border-radius:8px;border-left:3px solid var(--accent2);margin-bottom:10px;}
+  .bz-reason{font-size:12px;color:var(--text2);line-height:1.6;padding:10px 14px;background:var(--bg3);border-radius:8px;margin-bottom:10px;}
+  .bz-wait{font-size:12px;color:var(--yellow);padding:8px 14px;background:rgba(255,215,64,.06);border-radius:8px;border:1px solid rgba(255,215,64,.2);}
+  .risk-badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;}
+  .risk-low{background:rgba(0,230,118,.12);color:var(--green);border:1px solid rgba(0,230,118,.3);}
+  .risk-medium{background:rgba(255,215,64,.12);color:var(--yellow);border:1px solid rgba(255,215,64,.3);}
+  .risk-high{background:rgba(255,23,68,.12);color:var(--red);border:1px solid rgba(255,23,68,.3);}
 
-  .error-msg {
-    background: rgba(255,23,68,.08); border: 1px solid rgba(255,23,68,.3);
-    border-radius: var(--radius); padding: 16px 20px;
-    color: var(--red); text-align: center;
-  }
+  /* 走勢圖 */
+  .chart-area{position:relative;height:200px;margin-top:8px;}
+  .chart-area.small{height:90px;}
+  canvas{width:100%!important;}
 
-  .card {
-    background: var(--bg2); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 20px; margin-bottom: 16px;
-  }
+  /* 月營收 */
+  .rev-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
+  .rev-item{background:var(--bg3);border-radius:8px;padding:12px;}
+  .rev-item label{font-size:10px;color:var(--text2);display:block;margin-bottom:3px;}
+  .rev-item span{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:600;}
 
-  .price-header { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 4px; }
-  .stock-name { font-size: 20px; font-weight: 700; }
-  .stock-id {
-    font-family: 'JetBrains Mono', monospace; font-size: 13px;
-    color: var(--text2); background: var(--bg3); padding: 2px 8px; border-radius: 4px;
-  }
-  .price-main {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: clamp(28px, 5vw, 42px); font-weight: 600; line-height: 1; margin: 8px 0;
-  }
-  .price-change { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 500; }
-  .up { color: var(--red); }
-  .down { color: var(--green); }
-  .flat { color: var(--text2); }
-
-  .price-meta {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 12px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);
-  }
-  .meta-item label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; display: block; margin-bottom: 4px; }
-  .meta-item span { font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 500; }
-
-  .indicators { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
-  .ind-item { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
-  .ind-item label { font-size: 11px; color: var(--text2); display: block; margin-bottom: 6px; }
-  .ind-item span { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 600; }
-
-  .signal-card { border-left: 4px solid var(--accent); }
-  .signal-card.bullish { border-left-color: var(--red); }
-  .signal-card.bearish { border-left-color: var(--green); }
-  .signal-card.neutral { border-left-color: var(--yellow); }
-  .signal-title { font-size: 13px; color: var(--text2); margin-bottom: 8px; }
-  .signal-summary { font-size: 18px; font-weight: 700; margin-bottom: 12px; }
-  .signal-items { display: flex; flex-direction: column; gap: 6px; }
-  .signal-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-  .signal-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .sig-bullish .signal-dot { background: var(--red); }
-  .sig-bearish .signal-dot { background: var(--green); }
-  .sig-neutral .signal-dot { background: var(--yellow); }
-
-  /* ── AI 買入區間卡 ── */
-  .buy-zone-card {
-    background: var(--bg2);
-    border: 1px solid rgba(0, 212, 255, 0.25);
-    border-radius: var(--radius);
-    padding: 20px;
-    margin-bottom: 16px;
-    position: relative;
-    overflow: hidden;
-  }
-  .buy-zone-card::before {
-    content: '';
-    position: absolute; top: 0; left: 0; right: 0; height: 2px;
-    background: linear-gradient(90deg, var(--accent2), var(--accent));
-  }
-  .buy-zone-header {
-    display: flex; align-items: center; gap: 8px; margin-bottom: 16px;
-  }
-  .buy-zone-header .ai-badge {
-    background: linear-gradient(135deg, var(--accent2), var(--accent));
-    color: #fff; font-size: 10px; font-weight: 700;
-    padding: 2px 8px; border-radius: 20px; letter-spacing: 1px;
-  }
-  .buy-zone-header .title { font-size: 14px; color: var(--text2); }
-
-  .buy-zone-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 12px; margin-bottom: 16px;
-  }
-  .bz-item {
-    background: var(--bg3); border-radius: 8px; padding: 14px;
-    border: 1px solid var(--border);
-  }
-  .bz-item label { font-size: 11px; color: var(--text2); display: block; margin-bottom: 6px; }
-  .bz-item span { font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 700; }
-  .bz-item.buy span { color: var(--accent); }
-  .bz-item.stop span { color: var(--red); }
-  .bz-item.target span { color: var(--green); }
-
-  .buy-range-bar {
-    background: var(--bg3); border-radius: 8px; padding: 12px 16px;
-    display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
-  }
-  .range-label { font-size: 12px; color: var(--text2); white-space: nowrap; }
-  .range-track {
-    flex: 1; height: 8px; background: var(--border); border-radius: 4px; position: relative;
-  }
-  .range-fill {
-    position: absolute; height: 100%; border-radius: 4px;
-    background: linear-gradient(90deg, var(--accent2), var(--accent));
-  }
-  .range-price {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13px; color: var(--accent); white-space: nowrap;
-  }
-
-  .bz-reason {
-    font-size: 13px; color: var(--text2); line-height: 1.6;
-    padding: 10px 14px; background: var(--bg3); border-radius: 8px;
-    border-left: 3px solid var(--accent2);
-  }
-
-  .risk-badge {
-    display: inline-flex; align-items: center; gap: 6px;
-    font-size: 11px; font-weight: 600; padding: 3px 10px;
-    border-radius: 20px; margin-top: 10px;
-  }
-  .risk-low { background: rgba(0,230,118,.12); color: var(--green); border: 1px solid rgba(0,230,118,.3); }
-  .risk-medium { background: rgba(255,215,64,.12); color: var(--yellow); border: 1px solid rgba(255,215,64,.3); }
-  .risk-high { background: rgba(255,23,68,.12); color: var(--red); border: 1px solid rgba(255,23,68,.3); }
-
-  .chart-area { position: relative; height: 180px; margin-top: 8px; }
-  canvas { width: 100% !important; }
-  .section-title { font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
-
-  .rev-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
-  .rev-item { background: var(--bg3); border-radius: 8px; padding: 14px; }
-  .rev-item label { font-size: 11px; color: var(--text2); display: block; margin-bottom: 4px; }
-  .rev-item span { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 600; }
-
-  .updated-tag { font-size: 11px; color: var(--text2); text-align: right; margin-top: 4px; }
-
-  footer { text-align: center; margin-top: 40px; color: var(--text2); font-size: 11px; line-height: 1.8; }
+  .updated-tag{font-size:11px;color:var(--text2);text-align:right;margin-top:4px;}
+  footer{text-align:center;margin-top:40px;color:var(--text2);font-size:11px;line-height:1.8;}
 </style>
 </head>
 <body>
-
 <div class="header">
   <h1>台股分析儀</h1>
-  <p>輸入股票代號，取得即時技術分析與 AI 買入建議</p>
+  <p>中長期技術面分析｜AI 買入時機評估</p>
 </div>
 
 <div class="search-box">
@@ -254,30 +150,23 @@
 
 <footer>
   資料來源：FinMind｜AI 分析：Claude (Anthropic)｜本工具僅供參考，不構成投資建議<br>
-  技術指標：MA5 / MA20 / RSI(14)
+  指標：MA20/60/120/240・MACD・月KD・RSI・本益比・殖利率
 </footer>
 
 <script>
-let chartInstance = null;
+let priceChart = null, macdChart = null;
 
-function quickSearch(id) {
-  document.getElementById('stockInput').value = id;
-  analyze();
-}
+function quickSearch(id) { document.getElementById('stockInput').value = id; analyze(); }
 
 async function analyze() {
   const stockId = document.getElementById('stockInput').value.trim();
   if (!stockId) return;
-
   const btn = document.getElementById('searchBtn');
   const result = document.getElementById('result');
-
-  btn.disabled = true;
-  btn.textContent = '分析中…';
-  result.innerHTML = '<div class="loading">正在從 FinMind 拉取資料並進行 AI 分析</div>';
-
-  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
-
+  btn.disabled = true; btn.textContent = '分析中…';
+  result.innerHTML = '<div class="loading">正在取得資料並進行 AI 中長期評估</div>';
+  if (priceChart) { priceChart.destroy(); priceChart = null; }
+  if (macdChart) { macdChart.destroy(); macdChart = null; }
   try {
     const res = await fetch(`/api/analyze?stock_id=${encodeURIComponent(stockId)}`);
     const data = await res.json();
@@ -285,105 +174,90 @@ async function analyze() {
     renderResult(data);
   } catch (e) {
     result.innerHTML = `<div class="error-msg">⚠️ ${e.message}</div>`;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '分析';
-  }
+  } finally { btn.disabled = false; btn.textContent = '分析'; }
 }
 
-function fmt(n, dec = 2) {
-  if (n == null) return '—';
-  return Number(n).toLocaleString('zh-TW', { minimumFractionDigits: dec, maximumFractionDigits: dec });
-}
+const fmt = (n, d=2) => n == null ? '—' : Number(n).toLocaleString('zh-TW',{minimumFractionDigits:d,maximumFractionDigits:d});
+const fmtVol = v => { if(!v) return '—'; if(v>=1e8) return (v/1e8).toFixed(1)+' 億'; if(v>=1e4) return (v/1e4).toFixed(1)+' 萬'; return v.toLocaleString(); };
 
-function fmtVol(v) {
-  if (!v) return '—';
-  if (v >= 1e8) return (v / 1e8).toFixed(1) + ' 億';
-  if (v >= 1e4) return (v / 1e4).toFixed(1) + ' 萬';
-  return v.toLocaleString();
-}
-
-function renderBuyZone(bz, currentPrice) {
+function renderBuyZone(bz, price) {
   if (!bz) return '';
-  const riskLabel = { low: '低風險', medium: '中等風險', high: '較高風險' }[bz.risk] || '';
-  const riskClass = { low: 'risk-low', medium: 'risk-medium', high: 'risk-high' }[bz.risk] || 'risk-medium';
-
-  // 計算進度條：買入區間在52週範圍中的位置
-  const rangeMin = Math.min(bz.stop_loss, bz.buy_low) * 0.98;
-  const rangeMax = Math.max(bz.target, currentPrice) * 1.02;
-  const total = rangeMax - rangeMin;
-  const fillLeft = ((bz.buy_low - rangeMin) / total * 100).toFixed(1);
-  const fillWidth = ((bz.buy_high - bz.buy_low) / total * 100).toFixed(1);
-
+  const eqClass = { excellent:'eq-excellent', good:'eq-good', fair:'eq-fair', poor:'eq-poor' }[bz.entry_quality] || 'eq-fair';
+  const riskClass = { low:'risk-low', medium:'risk-medium', high:'risk-high' }[bz.risk] || 'risk-medium';
+  const riskLabel = { low:'低風險', medium:'中等風險', high:'較高風險' }[bz.risk] || '';
+  const waitHtml = bz.wait_for ? `<div class="bz-wait">⏳ 等待條件：${bz.wait_for}</div>` : '';
   return `
     <div class="buy-zone-card">
-      <div class="buy-zone-header">
+      <div class="bz-header">
         <span class="ai-badge">AI</span>
-        <span class="title">建議買入區間</span>
+        <span class="bz-title">中長期買入評估</span>
+        <span class="entry-quality ${eqClass}">${bz.entry_label || ''}</span>
       </div>
-
-      <div class="buy-zone-grid">
-        <div class="bz-item buy">
-          <label>建議買入區間</label>
-          <span>${fmt(bz.buy_low)} – ${fmt(bz.buy_high)}</span>
-        </div>
-        <div class="bz-item stop">
-          <label>建議停損價</label>
-          <span>${fmt(bz.stop_loss)}</span>
-        </div>
-        <div class="bz-item target">
-          <label>短線目標價</label>
-          <span>${fmt(bz.target)}</span>
-        </div>
+      <div class="bz-grid">
+        <div class="bz-item buy"><label>建議買入區間</label><span>${fmt(bz.buy_low)} – ${fmt(bz.buy_high)}</span></div>
+        <div class="bz-item stop"><label>中長期停損</label><span>${fmt(bz.stop_loss)}</span></div>
+        <div class="bz-item t6"><label>6個月目標</label><span>${fmt(bz.target_6m)}</span></div>
+        <div class="bz-item t12"><label>12個月目標</label><span>${fmt(bz.target_12m)}</span></div>
       </div>
-
-      <div class="buy-range-bar">
-        <span class="range-label">停損 ${fmt(bz.stop_loss)}</span>
-        <div class="range-track">
-          <div class="range-fill" style="left:${fillLeft}%;width:${fillWidth}%"></div>
-        </div>
-        <span class="range-price">目標 ${fmt(bz.target)}</span>
-      </div>
-
+      <div class="bz-strategy">📋 ${bz.strategy}</div>
       <div class="bz-reason">💡 ${bz.reason}</div>
-      <div class="risk-badge ${riskClass}">風險評估：${riskLabel}</div>
+      ${waitHtml}
+      <span class="risk-badge ${riskClass}">風險評估：${riskLabel}</span>
     </div>`;
 }
 
 function renderResult(d) {
-  const p = d.price;
-  const ind = d.indicators;
-  const sig = d.signal;
+  const p = d.price, ind = d.indicators, sig = d.signal;
+  const cc = p.change_percent > 0 ? 'up' : p.change_percent < 0 ? 'down' : 'flat';
+  const cs = p.change_percent > 0 ? '+' : '';
+  const sigCC = { bullish:'bullish', bearish:'bearish', neutral:'neutral' }[sig.overall];
+  const sigColor = { bullish:'var(--red)', bearish:'var(--green)', neutral:'var(--yellow)' }[sig.overall];
 
-  const changeClass = p.change_percent > 0 ? 'up' : p.change_percent < 0 ? 'down' : 'flat';
-  const changeSign = p.change_percent > 0 ? '+' : '';
-  const sigColorClass = sig.overall === 'bullish' ? 'bullish' : sig.overall === 'bearish' ? 'bearish' : 'neutral';
-  const sigTextColor = sig.overall === 'bullish' ? 'var(--red)' : sig.overall === 'bearish' ? 'var(--green)' : 'var(--yellow)';
+  const maTagsHtml = (ind.ma_position || []).map(t => {
+    const above = t.includes('站上');
+    return `<span class="ma-tag ${above?'above':'below'}">${t}</span>`;
+  }).join('');
 
-  let revenueHtml = '';
+  const macdColor = ind.macd_hist > 0 ? 'var(--red)' : 'var(--green)';
+  const monthKColor = ind.month_k < 30 ? 'var(--accent)' : ind.month_k > 70 ? 'var(--red)' : 'var(--text)';
+
+  let valHtml = '';
+  if (d.valuation) {
+    const v = d.valuation;
+    valHtml = `
+      <div class="card">
+        <div class="section-title">估值指標（${v.date || ''}）</div>
+        <div class="val-grid">
+          <div class="val-item"><label>本益比 P/E</label><span>${v.per != null ? v.per + 'x' : '—'}</span></div>
+          <div class="val-item"><label>股價淨值比 P/B</label><span>${v.pbr != null ? v.pbr + 'x' : '—'}</span></div>
+          <div class="val-item"><label>殖利率</label><span>${v.yield != null ? v.yield + '%' : '—'}</span></div>
+        </div>
+      </div>`;
+  }
+
+  let revHtml = '';
   if (d.monthly_revenue) {
     const r = d.monthly_revenue;
-    const yoyClass = r.yoy > 0 ? 'up' : r.yoy < 0 ? 'down' : '';
-    const momClass = r.mom > 0 ? 'up' : r.mom < 0 ? 'down' : '';
-    revenueHtml = `
+    revHtml = `
       <div class="card">
         <div class="section-title">月營收（${r.date.slice(0,7)}）</div>
         <div class="rev-grid">
-          <div class="rev-item"><label>當月營收</label><span>${fmtVol(r.revenue)} 元</span></div>
-          <div class="rev-item"><label>年增率 YoY</label><span class="${yoyClass}">${r.yoy != null ? (r.yoy > 0 ? '+' : '') + fmt(r.yoy) + '%' : '—'}</span></div>
-          <div class="rev-item"><label>月增率 MoM</label><span class="${momClass}">${r.mom != null ? (r.mom > 0 ? '+' : '') + fmt(r.mom) + '%' : '—'}</span></div>
+          <div class="rev-item"><label>當月營收</label><span>${fmtVol(r.revenue)}</span></div>
+          <div class="rev-item"><label>年增率 YoY</label><span class="${r.yoy>0?'up':r.yoy<0?'down':''}">${r.yoy!=null?(r.yoy>0?'+':'')+fmt(r.yoy)+'%':'—'}</span></div>
+          <div class="rev-item"><label>月增率 MoM</label><span class="${r.mom>0?'up':r.mom<0?'down':''}">${r.mom!=null?(r.mom>0?'+':'')+fmt(r.mom)+'%':'—'}</span></div>
         </div>
       </div>`;
   }
 
   document.getElementById('result').innerHTML = `
+    <!-- 股價 -->
     <div class="card">
       <div class="price-header">
         <span class="stock-name">${d.name}</span>
         <span class="stock-id">${d.stock_id}</span>
       </div>
-      <div class="price-main ${changeClass}">${fmt(p.close)}</div>
-      <div class="price-change ${changeClass}">${p.change_percent != null ? changeSign + fmt(p.change_percent) + '%' : ''}</div>
+      <div class="price-main ${cc}">${fmt(p.close)}</div>
+      <div class="price-change ${cc}">${p.change_percent!=null?cs+fmt(p.change_percent)+'%':''}</div>
       <div class="price-meta">
         <div class="meta-item"><label>開盤</label><span>${fmt(p.open)}</span></div>
         <div class="meta-item"><label>最高</label><span class="up">${fmt(p.high)}</span></div>
@@ -394,85 +268,134 @@ function renderResult(d) {
       </div>
     </div>
 
+    <!-- 均線 -->
     <div class="card">
-      <div class="section-title">技術指標</div>
-      <div class="indicators">
-        <div class="ind-item"><label>MA 5日</label><span>${fmt(ind.ma5)}</span></div>
-        <div class="ind-item"><label>MA 20日</label><span>${fmt(ind.ma20)}</span></div>
+      <div class="section-title">均線位置</div>
+      <div class="ind-grid">
+        <div class="ind-item"><label>季線 MA60</label><span>${fmt(ind.ma60)}</span></div>
+        <div class="ind-item"><label>半年線 MA120</label><span>${fmt(ind.ma120)}</span></div>
+        <div class="ind-item"><label>年線 MA240</label><span>${fmt(ind.ma240)}</span></div>
+        <div class="ind-item"><label>月線 MA20</label><span>${fmt(ind.ma20)}</span></div>
+      </div>
+      <div class="ma-position">${maTagsHtml}</div>
+    </div>
+
+    <!-- 動能指標 -->
+    <div class="card">
+      <div class="section-title">動能指標</div>
+      <div class="ind-grid">
+        <div class="ind-item">
+          <label>MACD 柱狀</label>
+          <span style="color:${macdColor}">${fmt(ind.macd_hist)}</span>
+          <div class="sub">DIF ${fmt(ind.macd_line)} / DEA ${fmt(ind.macd_signal)}</div>
+        </div>
+        <div class="ind-item">
+          <label>月 KD</label>
+          <span style="color:${monthKColor}">K ${fmt(ind.month_k,1)}</span>
+          <div class="sub">D ${fmt(ind.month_d,1)}</div>
+        </div>
         <div class="ind-item">
           <label>RSI(14)</label>
-          <span style="color:${ind.rsi < 30 ? 'var(--red)' : ind.rsi > 70 ? 'var(--green)' : 'var(--text)'}">${fmt(ind.rsi)}</span>
+          <span style="color:${ind.rsi<40?'var(--accent)':ind.rsi>70?'var(--red)':'var(--text)'}">${fmt(ind.rsi)}</span>
         </div>
       </div>
     </div>
 
-    <div class="card signal-card ${sigColorClass}">
-      <div class="signal-title">綜合訊號</div>
-      <div class="signal-summary" style="color:${sigTextColor}">${sig.summary}</div>
+    <!-- 綜合訊號 -->
+    <div class="card signal-card ${sigCC}">
+      <div class="section-title">中長期綜合訊號</div>
+      <div class="signal-score">
+        <span class="score-bull">多方訊號 ${sig.bullScore}</span>
+        <span class="score-bear">空方訊號 ${sig.bearScore}</span>
+      </div>
+      <div class="signal-summary" style="color:${sigColor}">${sig.summary}</div>
       <div class="signal-items">
-        ${sig.signals.map(s => `<div class="signal-item sig-${s.type}"><span class="signal-dot"></span><span>${s.text}</span></div>`).join('')}
+        ${sig.signals.map(s=>`<div class="signal-item sig-${s.type}"><span class="signal-dot"></span><span>${s.text}</span></div>`).join('')}
       </div>
     </div>
 
+    <!-- AI 買入評估 -->
     ${renderBuyZone(d.buy_zone, p.close)}
 
+    ${valHtml}
+
+    <!-- 走勢圖 -->
     <div class="card">
-      <div class="section-title">近30日走勢</div>
+      <div class="section-title">近60日走勢（含均線）</div>
       <div class="chart-area"><canvas id="priceChart"></canvas></div>
     </div>
 
-    ${revenueHtml}
+    <!-- MACD 圖 -->
+    <div class="card">
+      <div class="section-title">MACD</div>
+      <div class="chart-area small"><canvas id="macdChart"></canvas></div>
+    </div>
+
+    ${revHtml}
     <div class="updated-tag">資料日期：${d.updated}</div>
   `;
 
-  renderChart(d.history, d.buy_zone);
+  loadChartJS(() => {
+    drawPriceChart(d.history, d.buy_zone);
+    drawMacdChart(d.history);
+  });
 }
 
-function renderChart(history, bz) {
-  const script = document.createElement('script');
-  script.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
-  script.onload = () => drawChart(history, bz);
-  document.head.appendChild(script);
+function loadChartJS(cb) {
+  if (window.Chart) return cb();
+  const s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+  s.onload = cb;
+  document.head.appendChild(s);
 }
 
-function drawChart(history, bz) {
+function drawPriceChart(history, bz) {
   const ctx = document.getElementById('priceChart');
   if (!ctx) return;
-
   const labels = history.map(d => d.date.slice(5));
   const closes = history.map(d => d.close);
-  const ma5 = history.map(d => d.ma5);
-  const ma20 = history.map(d => d.ma20);
-
   const datasets = [
-    { label: '收盤價', data: closes, borderColor: '#00d4ff', backgroundColor: 'rgba(0,212,255,.08)', borderWidth: 2, fill: true, tension: 0.3, pointRadius: 0 },
-    { label: 'MA5', data: ma5, borderColor: '#ffd740', borderWidth: 1.5, fill: false, tension: 0.3, pointRadius: 0 },
-    { label: 'MA20', data: ma20, borderColor: '#ff6e40', borderWidth: 1.5, fill: false, tension: 0.3, pointRadius: 0 },
+    { label:'收盤價', data:closes, borderColor:'#00d4ff', backgroundColor:'rgba(0,212,255,.07)', borderWidth:2, fill:true, tension:.3, pointRadius:0 },
+    { label:'MA20', data:history.map(d=>d.ma20), borderColor:'#ffd740', borderWidth:1.5, fill:false, tension:.3, pointRadius:0 },
+    { label:'MA60', data:history.map(d=>d.ma60), borderColor:'#ff9100', borderWidth:1.5, fill:false, tension:.3, pointRadius:0 },
+    { label:'MA240', data:history.map(d=>d.ma240), borderColor:'#cc44ff', borderWidth:1.5, fill:false, tension:.3, pointRadius:0 },
   ];
-
-  // 買入區間水平線
   if (bz) {
-    datasets.push({ label: `買入下緣 ${bz.buy_low}`, data: labels.map(() => bz.buy_low), borderColor: 'rgba(0,212,255,.5)', borderWidth: 1, borderDash: [4,4], fill: false, pointRadius: 0 });
-    datasets.push({ label: `買入上緣 ${bz.buy_high}`, data: labels.map(() => bz.buy_high), borderColor: 'rgba(0,102,255,.5)', borderWidth: 1, borderDash: [4,4], fill: false, pointRadius: 0 });
-    datasets.push({ label: `停損 ${bz.stop_loss}`, data: labels.map(() => bz.stop_loss), borderColor: 'rgba(255,23,68,.4)', borderWidth: 1, borderDash: [2,4], fill: false, pointRadius: 0 });
-    datasets.push({ label: `目標 ${bz.target}`, data: labels.map(() => bz.target), borderColor: 'rgba(0,230,118,.4)', borderWidth: 1, borderDash: [2,4], fill: false, pointRadius: 0 });
+    datasets.push({ label:`買入 ${bz.buy_low}–${bz.buy_high}`, data:labels.map(()=>bz.buy_low), borderColor:'rgba(0,212,255,.5)', borderWidth:1, borderDash:[4,3], fill:false, pointRadius:0 });
+    datasets.push({ label:`停損 ${bz.stop_loss}`, data:labels.map(()=>bz.stop_loss), borderColor:'rgba(255,23,68,.4)', borderWidth:1, borderDash:[2,4], fill:false, pointRadius:0 });
+    datasets.push({ label:`目標12m ${bz.target_12m}`, data:labels.map(()=>bz.target_12m), borderColor:'rgba(0,230,118,.4)', borderWidth:1, borderDash:[2,4], fill:false, pointRadius:0 });
   }
+  priceChart = new Chart(ctx, {
+    type:'line', data:{labels, datasets},
+    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+      plugins:{ legend:{labels:{color:'#94a3b8',font:{size:10},boxWidth:12,padding:10}} ,
+        tooltip:{backgroundColor:'#1a2235',borderColor:'#1e2d45',borderWidth:1,titleColor:'#94a3b8',bodyColor:'#e2e8f0'}},
+      scales:{ x:{ticks:{color:'#94a3b8',font:{size:10},maxTicksLimit:8},grid:{color:'rgba(255,255,255,.04)'}},
+               y:{position:'right',ticks:{color:'#94a3b8',font:{size:10,family:'JetBrains Mono'}},grid:{color:'rgba(255,255,255,.04)'}}}}
+  });
+}
 
-  chartInstance = new Chart(ctx, {
-    type: 'line',
-    data: { labels, datasets },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { labels: { color: '#94a3b8', font: { size: 10 }, boxWidth: 12, padding: 12 } },
-        tooltip: { backgroundColor: '#1a2235', borderColor: '#1e2d45', borderWidth: 1, titleColor: '#94a3b8', bodyColor: '#e2e8f0' },
-      },
-      scales: {
-        x: { ticks: { color: '#94a3b8', font: { size: 10 }, maxTicksLimit: 8 }, grid: { color: 'rgba(255,255,255,.04)' } },
-        y: { position: 'right', ticks: { color: '#94a3b8', font: { size: 10, family: 'JetBrains Mono' } }, grid: { color: 'rgba(255,255,255,.04)' } },
-      },
-    },
+function drawMacdChart(history) {
+  const ctx = document.getElementById('macdChart');
+  if (!ctx) return;
+  const labels = history.map(d => d.date.slice(5));
+  macdChart = new Chart(ctx, {
+    type:'bar',
+    data:{ labels,
+      datasets:[
+        { label:'MACD柱', data:history.map(d=>d.macd_hist),
+          backgroundColor: history.map(d=>(d.macd_hist||0)>0?'rgba(255,23,68,.6)':'rgba(0,230,118,.6)'),
+          borderWidth:0 },
+        { label:'DIF', data:history.map(d=>d.macd), type:'line',
+          borderColor:'#00d4ff', borderWidth:1.5, fill:false, pointRadius:0, tension:.3 },
+        { label:'DEA', data:history.map(d=>d.macd_signal), type:'line',
+          borderColor:'#ffd740', borderWidth:1.5, fill:false, pointRadius:0, tension:.3 },
+      ]},
+    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+      plugins:{ legend:{labels:{color:'#94a3b8',font:{size:10},boxWidth:10,padding:10}},
+        tooltip:{backgroundColor:'#1a2235',borderColor:'#1e2d45',borderWidth:1,titleColor:'#94a3b8',bodyColor:'#e2e8f0'}},
+      scales:{ x:{ticks:{color:'#94a3b8',font:{size:10},maxTicksLimit:8},grid:{color:'rgba(255,255,255,.04)'}},
+               y:{position:'right',ticks:{color:'#94a3b8',font:{size:9,family:'JetBrains Mono'}},grid:{color:'rgba(255,255,255,.04)'}}}}
   });
 }
 </script>
