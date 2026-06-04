@@ -186,6 +186,16 @@
 
 
   .updated-tag{font-size:10px;color:var(--text2);text-align:right;margin-top:4px;}
+  /* 分批進場 */
+  .batches-section{margin-bottom:14px;}
+  .batches-title{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
+  .batches-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;}
+  .batch-card{background:var(--bg3);border-radius:8px;padding:12px;border:1px solid var(--border);}
+  .batch-num{font-size:10px;font-weight:700;color:var(--text2);margin-bottom:6px;text-transform:uppercase;}
+  .batch-ratio{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:var(--accent);margin-bottom:4px;}
+  .batch-price{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);margin-bottom:4px;}
+  .batch-trigger{font-size:10px;color:var(--text2);line-height:1.4;}
+
   /* 熱門題材 */
   .themes-panel{max-width:960px;margin:0 auto 40px;}
 
@@ -318,6 +328,11 @@
   <div class="disclaimer">適合中長線趨勢觀察，不適合作為即時交易決策依據</div>
 </div>
 
+<div style="max-width:960px;margin:0 auto 8px;display:flex;align-items:center;gap:10px;">
+  <div style="flex:1;height:1px;background:var(--border);"></div>
+  <span style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:1.5px;white-space:nowrap;">① 熱門題材掃描</span>
+  <div style="flex:1;height:1px;background:var(--border);"></div>
+</div>
 <div class="themes-panel">
   <div class="themes-header">
     <span class="themes-header-icon">🔥</span>
@@ -331,6 +346,11 @@
   <div id="themes-result"></div>
 </div>
 
+<div style="max-width:960px;margin:0 auto 12px;display:flex;align-items:center;gap:10px;">
+  <div style="flex:1;height:1px;background:var(--border);"></div>
+  <span style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:1.5px;white-space:nowrap;">② 個股技術分析</span>
+  <div style="flex:1;height:1px;background:var(--border);"></div>
+</div>
 <div class="search-box">
   <input id="stockInput" type="text" placeholder="台股代號 2330 或美股 AAPL"
     maxlength="10" oninput="detectMarket()" onkeydown="if(event.key==='Enter')analyze()">
@@ -460,6 +480,18 @@ function renderBuyZoneHTML(bz){
   const scoreColor=bz.score>=70?'var(--green)':bz.score>=50?'var(--yellow)':'var(--red)';
   const waitHtml=bz.wait_for?`<div class="bz-wait">⏳ 觀察條件：${bz.wait_for}</div>`:'';
   const biasWarnHtml=bz.bias_warning?`<div class="bz-bias-warn">🚨 ${bz.bias_warning}</div>`:'';
+  const batchesHtml=(bz.batches||[]).length?`
+    <div class="batches-section">
+      <div class="batches-title">分批進場計劃</div>
+      <div class="batches-grid">
+        ${(bz.batches||[]).map(b=>`<div class="batch-card">
+          <div class="batch-num">第 ${b.batch} 批</div>
+          <div class="batch-ratio">${b.ratio}</div>
+          <div class="batch-price">${fmt(b.price_low)} – ${fmt(b.price_high)} ${cur}</div>
+          <div class="batch-trigger">${b.trigger}</div>
+        </div>`).join('')}
+      </div>
+    </div>`:'';
   const checklistHtml=(bz.checklist||[]).map(c=>{
     const icon={pass:'✅',warn:'⚠️',fail:'❌'}[c.status]||'•';
     return `<div class="cl-item"><span class="cl-icon">${icon}</span><span class="cl-name">${c.item}</span><span class="cl-note">${c.note||''}</span></div>`;
@@ -475,11 +507,11 @@ function renderBuyZoneHTML(bz){
     </div>
     ${biasWarnHtml}
     <div class="bz-grid">
-      <div class="bz-item buy"><label>觀察區間（參考）</label><span>${fmt(bz.buy_low)} – ${fmt(bz.buy_high)}</span></div>
       <div class="bz-item stop"><label>風險控管參考</label><span>${fmt(bz.stop_loss)}</span></div>
       <div class="bz-item t6"><label>6 個月情境價</label><span>${fmt(bz.target_6m)}</span></div>
       <div class="bz-item t12"><label>12 個月情境價</label><span>${fmt(bz.target_12m)}</span></div>
     </div>
+    ${batchesHtml}
     ${checklistHtml?`<div class="checklist-title">操作檢查清單</div><div class="checklist">${checklistHtml}</div>`:''}
     <div class="bz-strategy">📋 ${bz.strategy}</div>
     <div class="bz-reason">💡 ${bz.reason}</div>
@@ -490,7 +522,7 @@ function renderBuyZoneHTML(bz){
 }
 
 function renderNewsHTML(articles,isUSMarket){
-  if(!articles.length)return`<div class="news-card"><div class="section-title">最新新聞輿情</div><div class="news-empty">近期無相關新聞</div></div>`;
+  if(!articles.length)return`<div class="news-card"><div class="section-title">最新新聞輿情</div><div class="news-empty">近14日暫無高相關新聞</div></div>`;
   const items=articles.map(a=>{
     let pubStr='日期未知';
     if(a.published){
@@ -654,54 +686,49 @@ function loadChartJS(cb){if(window.Chart)return cb();const s=document.createElem
 
 function drawPriceChart(h){
   const ctx=document.getElementById('priceChart');if(!ctx||!h||!h.length)return;
-  // 只取有效收盤價的點，X 軸自動 fit 實際資料範圍
-  const valid=h.filter(d=>d.close!=null&&d.close>0);
+  // 只渲染有有效收盤價的資料點，避免右側空白
+  const valid=h.filter(d=>d.close!=null&&!isNaN(d.close)&&d.close>0);
   if(!valid.length)return;
-  const labels=valid.map(d=>d.date.slice(5));
   const n=valid.length;
-  // 更新資料筆數顯示
   const noteEl=document.getElementById('chart-note');
-  if(noteEl)noteEl.textContent=n<55?`目前取得 ${n} 筆資料`:'';
+  const firstDate=valid[0]?.date?.slice(5)||'';
+  const lastDate=valid[n-1]?.date?.slice(5)||'';
+  if(noteEl)noteEl.textContent=n<55?`取得 ${n} 筆資料（${firstDate} ~ ${lastDate}）`:`${firstDate} ~ ${lastDate}`;
+  const labels=valid.map(d=>d.date.slice(5));
+  if(priceChart){priceChart.destroy();priceChart=null;}
   priceChart=new Chart(ctx,{type:'line',data:{labels,datasets:[
-    {label:'收盤價',data:valid.map(d=>d.close),borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,.07)',borderWidth:2,fill:true,tension:.3,pointRadius:0,spanGaps:false},
-    {label:'MA20',data:valid.map(d=>d.ma20??null),borderColor:'#ffd740',borderWidth:1.5,fill:false,tension:.3,pointRadius:0,spanGaps:false},
-    {label:'MA60',data:valid.map(d=>d.ma60??null),borderColor:'#ff9100',borderWidth:1.5,fill:false,tension:.3,pointRadius:0,spanGaps:false},
-    {label:'MA240',data:valid.map(d=>d.ma240??null),borderColor:'#cc44ff',borderWidth:1.5,fill:false,tension:.3,pointRadius:0,spanGaps:false},
-  ]},options:{responsive:true,maintainAspectRatio:false,
+    {label:'收盤價',data:valid.map(d=>d.close),borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,.07)',borderWidth:2,fill:true,tension:.3,pointRadius:0,spanGaps:true},
+    {label:'MA20',data:valid.map(d=>(d.ma20!=null&&!isNaN(d.ma20))?d.ma20:null),borderColor:'#ffd740',borderWidth:1.5,fill:false,tension:.3,pointRadius:0,spanGaps:true},
+    {label:'MA60',data:valid.map(d=>(d.ma60!=null&&!isNaN(d.ma60))?d.ma60:null),borderColor:'#ff9100',borderWidth:1.5,fill:false,tension:.3,pointRadius:0,spanGaps:true},
+    {label:'MA240',data:valid.map(d=>(d.ma240!=null&&!isNaN(d.ma240))?d.ma240:null),borderColor:'#cc44ff',borderWidth:1.5,fill:false,tension:.3,pointRadius:0,spanGaps:true},
+  ]},options:{responsive:true,maintainAspectRatio:false,animation:false,
     interaction:{mode:'index',intersect:false},
     plugins:{legend:{labels:{color:'#94a3b8',font:{size:10},boxWidth:12,padding:10}},
       tooltip:{backgroundColor:'#1a2235',borderColor:'#1e2d45',borderWidth:1,titleColor:'#94a3b8',bodyColor:'#e2e8f0',
-        callbacks:{label:c=>c.raw!=null?`${c.dataset.label}: ${fmt(c.raw)}`:null,
-          filter:i=>i.raw!=null}}},
+        callbacks:{label:c=>c.raw!=null?`${c.dataset.label}: ${fmt(c.raw)}`:null,filter:i=>i.raw!=null}}},
     scales:{
-      x:{ticks:{color:'#94a3b8',font:{size:10},maxTicksLimit:8,maxRotation:0},
-         grid:{color:'rgba(255,255,255,.04)'}},
-      y:{position:'right',
-         ticks:{color:'#94a3b8',font:{size:10,family:'JetBrains Mono'},callback:v=>fmt(v,0)},
-         grid:{color:'rgba(255,255,255,.04)'}}}}});
+      x:{ticks:{color:'#94a3b8',font:{size:10},maxTicksLimit:8,maxRotation:0},grid:{color:'rgba(255,255,255,.04)'}},
+      y:{position:'right',ticks:{color:'#94a3b8',font:{size:10,family:'JetBrains Mono'},callback:v=>fmt(v,0)},grid:{color:'rgba(255,255,255,.04)'}}}}});
 }
 
 function drawMacdChart(h){
   const ctx=document.getElementById('macdChart');if(!ctx||!h||!h.length)return;
-  const valid=h.filter(d=>d.close!=null&&d.close>0);
+  const valid=h.filter(d=>d.close!=null&&!isNaN(d.close)&&d.close>0);
   if(!valid.length)return;
   const labels=valid.map(d=>d.date.slice(5));
+  if(macdChart){macdChart.destroy();macdChart=null;}
   macdChart=new Chart(ctx,{type:'bar',data:{labels,datasets:[
-    {label:'MACD柱',data:valid.map(d=>d.macd_hist??null),
-     backgroundColor:valid.map(d=>(d.macd_hist||0)>0?'rgba(0,212,255,.6)':'rgba(148,163,184,.5)'),
-     borderWidth:0},
-    {label:'DIF',data:valid.map(d=>d.macd??null),type:'line',borderColor:'#00d4ff',borderWidth:1.5,fill:false,pointRadius:0,tension:.3,spanGaps:false},
-    {label:'DEA',data:valid.map(d=>d.macd_signal??null),type:'line',borderColor:'#ffd740',borderWidth:1.5,fill:false,pointRadius:0,tension:.3,spanGaps:false},
-  ]},options:{responsive:true,maintainAspectRatio:false,
+    {label:'MACD柱',data:valid.map(d=>(d.macd_hist!=null&&!isNaN(d.macd_hist))?d.macd_hist:null),
+     backgroundColor:valid.map(d=>(d.macd_hist||0)>0?'rgba(0,212,255,.6)':'rgba(148,163,184,.5)'),borderWidth:0},
+    {label:'DIF',data:valid.map(d=>(d.macd!=null&&!isNaN(d.macd))?d.macd:null),type:'line',borderColor:'#00d4ff',borderWidth:1.5,fill:false,pointRadius:0,tension:.3,spanGaps:true},
+    {label:'DEA',data:valid.map(d=>(d.macd_signal!=null&&!isNaN(d.macd_signal))?d.macd_signal:null),type:'line',borderColor:'#ffd740',borderWidth:1.5,fill:false,pointRadius:0,tension:.3,spanGaps:true},
+  ]},options:{responsive:true,maintainAspectRatio:false,animation:false,
     interaction:{mode:'index',intersect:false},
     plugins:{legend:{labels:{color:'#94a3b8',font:{size:10},boxWidth:10,padding:10}},
-      tooltip:{backgroundColor:'#1a2235',borderColor:'#1e2d45',borderWidth:1,titleColor:'#94a3b8',bodyColor:'#e2e8f0',
-        callbacks:{filter:i=>i.raw!=null}}},
+      tooltip:{backgroundColor:'#1a2235',borderColor:'#1e2d45',borderWidth:1,titleColor:'#94a3b8',bodyColor:'#e2e8f0',callbacks:{filter:i=>i.raw!=null}}},
     scales:{
-      x:{ticks:{color:'#94a3b8',font:{size:10},maxTicksLimit:8,maxRotation:0},
-         grid:{color:'rgba(255,255,255,.04)'}},
-      y:{position:'right',ticks:{color:'#94a3b8',font:{size:9,family:'JetBrains Mono'}},
-         grid:{color:'rgba(255,255,255,.04)'}}}}});
+      x:{ticks:{color:'#94a3b8',font:{size:10},maxTicksLimit:8,maxRotation:0},grid:{color:'rgba(255,255,255,.04)'}},
+      y:{position:'right',ticks:{color:'#94a3b8',font:{size:9,family:'JetBrains Mono'}},grid:{color:'rgba(255,255,255,.04)'}}}}});
 }
 
 let themeMarket = 'tw';
@@ -716,9 +743,12 @@ async function scanThemes() {
   const btn = document.getElementById('scanBtn');
   const result = document.getElementById('themes-result');
   btn.disabled = true; btn.textContent = '掃描中…';
-  result.innerHTML = '<div class="themes-loading">正在分析新聞與成交量，AI 整合中…</div>';
+  result.innerHTML = '<div class="themes-loading">正在搜尋新聞，AI 分析題材中（約10-15秒）…</div>';
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 25000);
   try {
-    const res = await fetch(`/api/hot-themes?market=${themeMarket}`);
+    const res = await fetch(`/api/hot-themes?market=${themeMarket}`, { signal: controller.signal });
+    clearTimeout(timer);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || '掃描失敗');
     result.innerHTML = renderThemes(data);
