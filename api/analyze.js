@@ -1,6 +1,4 @@
 // api/analyze.js — Vercel Serverless Function (CommonJS)
-// 需要 Node.js 18+（Vercel 預設），使用內建 fetch
-
 const FINMIND_BASE = "https://api.finmindtrade.com/api/v4/data";
 
 function daysAgo(n) {
@@ -11,17 +9,13 @@ function daysAgo(n) {
 
 async function finmindFetch(dataset, stockId, startDate) {
   const token = process.env.FINMIND_TOKEN;
-  if (!token) throw new Error("FINMIND_TOKEN 環境變數未設定，請在 Vercel → Settings → Environment Variables 新增");
-
+  if (!token) throw new Error("FINMIND_TOKEN 未設定");
   const endDate = new Date().toISOString().split("T")[0];
   const url = `${FINMIND_BASE}?dataset=${dataset}&data_id=${encodeURIComponent(stockId)}&start_date=${startDate}&end_date=${endDate}&token=${token}`;
-
   const res = await fetch(url);
   if (!res.ok) throw new Error(`FinMind HTTP 錯誤: ${res.status}`);
-
   const json = await res.json();
   if (json.status !== 200) throw new Error(`FinMind 錯誤: ${json.msg || JSON.stringify(json)}`);
-
   return json.data || [];
 }
 
@@ -70,28 +64,76 @@ function generateSignal(ma5, ma20, rsi) {
   return { overall, summary, signals };
 }
 
+// AI 買入區間分析
+async function getAIBuyZone(stockData) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return null;
+
+  const { stock_id, name, price, indicators, signal, monthly_revenue } = stockData;
+
+  const prompt = `你是台股技術分析師。根據以下數據，給出建議買入價位區間，只回傳 JSON，不要其他文字：
+
+股票：${name}（${stock_id}）
+現價：${price.close}
+今日：開 ${price.open} / 高 ${price.high} / 低 ${price.low}
+漲跌幅：${price.change_percent}%
+成交量：${price.volume}
+52週高：${indicators.high_52w} / 低：${indicators.low_52w}
+MA5：${indicators.ma5} / MA20：${indicators.ma20}
+RSI(14)：${indicators.rsi}
+訊號：${signal.summary}
+${monthly_revenue ? `月營收年增率：${monthly_revenue.yoy}%` : ''}
+
+請根據技術面（支撐位、均線、RSI）給出：
+{
+  "buy_low": 建議買入下緣價（數字）,
+  "buy_high": 建議買入上緣價（數字）,
+  "stop_loss": 建議停損價（數字）,
+  "target": 短線目標價（數字）,
+  "reason": "簡短說明邏輯（50字內）",
+  "risk": "low" | "medium" | "high"
+}`;
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 256,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    if (!res.ok) return null;
+    const json = await res.json();
+    const text = json.content?.[0]?.text || "";
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    return JSON.parse(match[0]);
+  } catch (_) {
+    return null;
+  }
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Content-Type", "application/json");
-
   if (req.method === "OPTIONS") return res.status(200).end();
 
   const { stock_id } = req.query;
-  if (!stock_id) {
-    return res.status(400).json({ error: "請提供 stock_id 參數，例如 ?stock_id=2330" });
-  }
+  if (!stock_id) return res.status(400).json({ error: "請提供 stock_id 參數" });
 
   try {
-    // 拉 90 天股價
     const raw = await finmindFetch("TaiwanStockPrice", stock_id, daysAgo(90));
-    if (!raw || raw.length === 0) {
-      return res.status(404).json({ error: `查無股票代號 ${stock_id}，請確認代號是否正確` });
-    }
+    if (!raw || raw.length === 0) return res.status(404).json({ error: `查無股票代號 ${stock_id}` });
 
-    // 排序（舊→新）
     raw.sort((a, b) => a.date.localeCompare(b.date));
-
     const latest = raw[raw.length - 1];
     const closes = raw.map(d => parseFloat(d.close));
 
@@ -109,10 +151,8 @@ module.exports = async function handler(req, res) {
     const last252 = closes.slice(-252);
     const high52 = Math.max(...last252);
     const low52 = Math.min(...last252);
-
     const signal = generateSignal(latestMa5, latestMa20, rsi);
 
-    // 月營收（可選）
     let monthly_revenue = null;
     try {
       const revRaw = await finmindFetch("TaiwanStockMonthRevenue", stock_id, daysAgo(365));
@@ -124,26 +164,20 @@ module.exports = async function handler(req, res) {
           date: last.date,
           revenue: last.revenue,
           yoy: last.revenue_year_over_year ?? null,
-          mom: prev2
-            ? Math.round(((last.revenue - prev2.revenue) / prev2.revenue) * 10000) / 100
-            : null,
+          mom: prev2 ? Math.round(((last.revenue - prev2.revenue) / prev2.revenue) * 10000) / 100 : null,
         };
       }
-    } catch (_) { /* 月營收非必要 */ }
+    } catch (_) {}
 
-    // 近 30 天歷史給前端畫圖
-    const history = raw.slice(-30).map((d, i, arr) => {
-      const idx = raw.length - 30 + i;
-      return {
-        date: d.date,
-        close: parseFloat(d.close),
-        volume: parseInt(d.Trading_Volume || d.volume || 0),
-        ma5: ma5arr[idx],
-        ma20: ma20arr[idx],
-      };
-    });
+    const history = raw.slice(-30).map((d, i) => ({
+      date: d.date,
+      close: parseFloat(d.close),
+      volume: parseInt(d.Trading_Volume || d.volume || 0),
+      ma5: ma5arr[raw.length - 30 + i],
+      ma20: ma20arr[raw.length - 30 + i],
+    }));
 
-    return res.status(200).json({
+    const stockData = {
       stock_id,
       name: latest.stock_name || stock_id,
       updated: latest.date,
@@ -159,7 +193,12 @@ module.exports = async function handler(req, res) {
       signal,
       monthly_revenue,
       history,
-    });
+    };
+
+    // 呼叫 AI 取得買入區間
+    const buy_zone = await getAIBuyZone(stockData);
+
+    return res.status(200).json({ ...stockData, buy_zone });
 
   } catch (err) {
     console.error("[analyze] error:", err.message);
