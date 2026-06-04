@@ -24,28 +24,61 @@ module.exports = async function handler(req, res) {
         `${name} 營收 展望 產業 分析`,
       ];
 
-  // 低品質域名黑名單（純報價頁、搜尋結果頁）
-  const BLOCKLIST = [
-    'wantgoo.com', 'tw.stock.yahoo.com', 'cn.investing.com',
-    'finance.yahoo.com/quote', 'marketwatch.com/investing/stock',
-    'stockcharts.com', 'tradingview.com/chart',
-    'finviz.com', 'wsj.com/market-data',
-    'goodinfo.tw', 'mops.twse.com.tw',
+  // 低品質域名與路徑黑名單
+  const DOMAIN_BLOCK = [
+    'wantgoo.com', 'tw.stock.yahoo.com', 'finance.yahoo.com/quote',
+    'goodinfo.tw', 'mops.twse.com.tw', 'stockcharts.com',
+    'tradingview.com', 'finviz.com', 'youtube.com', 'youtu.be',
+    'cmoney.tw/follow', 'cmoney.tw/notes',
+  ];
+  const PATH_BLOCK = [
+    '/quote/', '/symbol/', '/equities/', '/stocks/', '/investing/stock',
+    '/market-data/', '/markets/stocks/', '/companies/',
+    '/stock-price', 'stock-price-today', 'live-quote',
   ];
 
-  const isBlocked = (url) => BLOCKLIST.some(d => url.includes(d));
+  const isBlocked = (url) => {
+    const lower = url.toLowerCase();
+    if (DOMAIN_BLOCK.some(d => lower.includes(d))) return true;
+    if (PATH_BLOCK.some(p => lower.includes(p))) return true;
+    // 純股票代號頁（如 reuters.com/markets/companies/AAPL.O/）
+    if (/\/[A-Z]{1,5}\.[A-Z]{1,2}\/?$/.test(url)) return true;
+    return false;
+  };
+
+  // 嘗試從內文/標題中提取日期
+  const extractDate = (item) => {
+    if (item.published_date) return item.published_date;
+    // 嘗試從 content 或 title 提取日期模式
+    const text = (item.content || '') + ' ' + (item.title || '');
+    const patterns = [
+      /(\d{4})[年\-\/](\d{1,2})[月\-\/](\d{1,2})/,  // 2026年6月5日 or 2026-06-05
+      /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),?\s+(\d{4})/i,
+    ];
+    for (const re of patterns) {
+      const m = text.match(re);
+      if (m) {
+        try {
+          const d = new Date(m[0].replace(/年|月/g, '-').replace(/日/g, ''));
+          if (!isNaN(d) && d.getFullYear() >= 2024) return d.toISOString();
+        } catch(_) {}
+      }
+    }
+    return null;
+  };
 
   // 判斷是否為有實質內容的新聞頁
   const isQualityArticle = (item) => {
     const url = item.url || '';
     const title = item.title || '';
-    const content = item.content || '';
+    const snippet = item.content || '';
     if (isBlocked(url)) return false;
-    if (content.length < 80) return false;  // 太短代表沒實質內容
-    // 排除明顯的股價查詢頁
-    if (/\/quote\/|\/symbol\/|\/stock\/[A-Z0-9]+\/?$/.test(url)) return false;
-    // 排除論壇討論串標題（不含實質財經資訊）
-    if (/今日|昨日|漲跌幅|股價查詢/.test(title) && content.length < 200) return false;
+    if (snippet.length < 80) return false;
+    // 過濾純股價查詢頁標題
+    const pricePageTitle = /stock price today|live quote|latest news.*price|price.*latest news/i;
+    if (pricePageTitle.test(title)) return false;
+    // markdown 連結污染（investing.com stock page 特徵）
+    if ((snippet.match(/\[.*?\]\(http/g) || []).length > 3) return false;
     return true;
   };
 
@@ -81,15 +114,18 @@ module.exports = async function handler(req, res) {
           if (item.published_date) {
             try { pubDate = new Date(item.published_date); } catch(_) {}
           }
+          const rawDate = extractDate(item);
+          let pubDate2 = null;
+          if (rawDate) { try { pubDate2 = new Date(rawDate); } catch(_) {} }
           articles.push({
             title: item.title,
             url: item.url,
             source: item.source || (() => {
               try { return new URL(item.url).hostname.replace('www.',''); } catch(_) { return ''; }
             })(),
-            published: item.published_date || null,
-            published_ts: pubDate ? pubDate.getTime() : 0,
-            snippet: (item.content || '').slice(0, 180),
+            published: rawDate || null,
+            published_ts: pubDate2 ? pubDate2.getTime() : 0,
+            snippet: (item.content || '').replace(/\[.*?\]\(https?:\/\/[^)]+\)/g, '').slice(0, 180).trim(),
             score: item.score || 0,
           });
         }
