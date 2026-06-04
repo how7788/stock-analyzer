@@ -187,53 +187,126 @@
 
   .updated-tag{font-size:10px;color:var(--text2);text-align:right;margin-top:4px;}
   /* 熱門題材 */
-  .themes-panel{max-width:960px;margin:0 auto 32px;}
-  .themes-header{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
-  .themes-header h2{font-size:15px;font-weight:700;color:var(--text);}
-  .market-switch{display:flex;gap:6px;}
-  .mkt-btn{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 14px;color:var(--text2);font-size:12px;cursor:pointer;transition:all .2s;}
-  .mkt-btn.active{background:rgba(0,212,255,.12);border-color:var(--accent);color:var(--accent);}
-  .scan-btn{background:linear-gradient(135deg,#ff6b00,#ffd700);border:none;border-radius:8px;padding:8px 20px;color:#000;font-size:13px;font-weight:700;cursor:pointer;transition:opacity .2s;white-space:nowrap;}
-  .scan-btn:hover{opacity:.85;}
-  .scan-btn:disabled{opacity:.5;cursor:not-allowed;}
-  .themes-loading{text-align:center;padding:32px;color:var(--text2);font-size:13px;}
-  .themes-loading::after{content:'';display:block;width:24px;height:24px;border:2px solid var(--border);border-top-color:#ffd700;border-radius:50%;margin:12px auto 0;animation:spin .8s linear infinite;}
-  .mood-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg3);border-radius:8px;margin-bottom:16px;flex-wrap:wrap;}
-  .mood-label{font-size:12px;color:var(--text2);}
-  .mood-value{font-size:14px;font-weight:700;}
+  .themes-panel{max-width:960px;margin:0 auto 40px;}
+
+  /* 標題列 */
+  .themes-header{
+    display:flex;align-items:center;gap:10px;
+    margin-bottom:20px;flex-wrap:wrap;
+    padding:16px 20px;
+    background:linear-gradient(135deg,rgba(255,107,0,.08),rgba(255,215,0,.06));
+    border:1px solid rgba(255,215,0,.15);
+    border-radius:var(--radius);
+  }
+  .themes-header-icon{font-size:22px;}
+  .themes-header h2{font-size:16px;font-weight:700;color:var(--text);flex:1;}
+  .market-switch{display:flex;gap:4px;background:var(--bg3);border-radius:8px;padding:3px;}
+  .mkt-btn{background:transparent;border:none;border-radius:6px;padding:5px 14px;color:var(--text2);font-size:12px;cursor:pointer;transition:all .2s;font-weight:500;}
+  .mkt-btn.active{background:var(--bg2);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.3);}
+  .scan-btn{
+    background:linear-gradient(135deg,#ff6b00,#ffd700);
+    border:none;border-radius:8px;padding:9px 22px;
+    color:#000;font-size:13px;font-weight:700;
+    cursor:pointer;transition:all .2s;white-space:nowrap;
+    box-shadow:0 2px 8px rgba(255,165,0,.3);
+  }
+  .scan-btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(255,165,0,.4);}
+  .scan-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+
+  /* 載入中 */
+  .themes-loading{text-align:center;padding:40px;color:var(--text2);font-size:13px;}
+  .themes-loading::after{content:'';display:block;width:28px;height:28px;border:2px solid var(--border);border-top-color:#ffd700;border-radius:50%;margin:14px auto 0;animation:spin .8s linear infinite;}
+
+  /* 市場氣氛 */
+  .mood-bar{
+    display:flex;align-items:center;gap:12px;
+    padding:12px 16px;
+    background:var(--bg2);border:1px solid var(--border);
+    border-radius:10px;margin-bottom:20px;flex-wrap:wrap;
+  }
+  .mood-label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;}
+  .mood-value{font-size:15px;font-weight:700;display:flex;align-items:center;gap:6px;}
   .mood-reason{font-size:12px;color:var(--text2);flex:1;}
   .mood-bull{color:var(--green);} .mood-bear{color:var(--red);} .mood-neutral{color:var(--yellow);}
-  .themes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-bottom:16px;}
-  .theme-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;transition:border-color .2s;}
-  .theme-card:hover{border-color:rgba(255,215,0,.3);}
-  .theme-top{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
-  .theme-name{font-size:15px;font-weight:700;flex:1;}
-  .theme-heat{display:flex;align-items:center;gap:4px;font-size:12px;}
-  .heat-bar{display:flex;gap:2px;}
-  .heat-dot{width:6px;height:6px;border-radius:50%;}
-  .heat-on{background:var(--yellow);}
-  .heat-off{background:var(--border);}
-  .theme-why{font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5;}
-  .theme-stocks{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}
-  .theme-stock{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg3);border-radius:6px;cursor:pointer;transition:background .2s;}
-  .theme-stock:hover{background:#1e2d45;}
-  .ts-id{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--accent);min-width:48px;}
-  .ts-name{font-size:12px;font-weight:500;flex:1;}
-  .ts-reason{font-size:10px;color:var(--text2);}
-  .theme-risk{font-size:10px;color:#f59e0b;padding:4px 8px;background:rgba(245,158,11,.08);border-radius:4px;border:1px solid rgba(245,158,11,.2);}
+
+  /* 題材卡片網格 */
+  .themes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px;margin-bottom:20px;}
+
+  /* 題材卡片 */
+  .theme-card{
+    background:var(--bg2);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:18px;
+    position:relative;overflow:hidden;
+    transition:transform .2s,border-color .2s,box-shadow .2s;
+  }
+  .theme-card::before{
+    content:'';position:absolute;top:0;left:0;right:0;height:3px;
+    background:linear-gradient(90deg,#ff6b00,#ffd700);
+    opacity:0;transition:opacity .2s;
+  }
+  .theme-card:hover{transform:translateY(-2px);border-color:rgba(255,215,0,.3);box-shadow:0 8px 24px rgba(0,0,0,.3);}
+  .theme-card:hover::before{opacity:1;}
+
+  .theme-top{display:flex;align-items:flex-start;gap:8px;margin-bottom:12px;}
+  .theme-name{font-size:15px;font-weight:700;flex:1;line-height:1.3;}
+  .theme-heat-badge{
+    display:flex;align-items:center;gap:4px;
+    padding:3px 8px;border-radius:20px;
+    background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.2);
+    white-space:nowrap;
+  }
+  .heat-score{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--yellow);}
+  .heat-flame{font-size:12px;}
+
+  .theme-why{font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6;padding-left:4px;border-left:2px solid rgba(255,215,0,.3);}
+
+  .theme-stocks{display:flex;flex-direction:column;gap:5px;margin-bottom:12px;}
+  .theme-stock{
+    display:flex;align-items:center;gap:10px;
+    padding:8px 10px;
+    background:var(--bg3);border-radius:8px;
+    cursor:pointer;transition:all .2s;
+    border:1px solid transparent;
+  }
+  .theme-stock:hover{background:rgba(0,212,255,.06);border-color:rgba(0,212,255,.2);}
+  .ts-id{
+    font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;
+    color:var(--accent);min-width:44px;
+  }
+  .ts-name{font-size:13px;font-weight:600;flex:1;}
+  .ts-reason{font-size:10px;color:var(--text2);text-align:right;}
+  .theme-risk{
+    font-size:11px;color:#f59e0b;
+    padding:5px 10px;
+    background:rgba(245,158,11,.06);border-radius:6px;
+    border:1px solid rgba(245,158,11,.15);
+    display:flex;align-items:center;gap:6px;
+  }
+
+  /* 追蹤清單 */
   .watch-section{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:14px;}
-  .watch-title{font-size:12px;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;}
+  .watch-title{font-size:11px;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;display:flex;align-items:center;gap:6px;}
   .watch-chips{display:flex;flex-wrap:wrap;gap:8px;}
-  .watch-chip{padding:5px 14px;background:var(--bg3);border:1px solid rgba(0,212,255,.2);border-radius:20px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent);cursor:pointer;transition:all .2s;}
-  .watch-chip:hover{background:rgba(0,212,255,.1);border-color:var(--accent);}
+  .watch-chip{
+    padding:6px 14px;background:var(--bg3);
+    border:1px solid rgba(0,212,255,.2);border-radius:20px;
+    font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;
+    color:var(--accent);cursor:pointer;transition:all .2s;
+  }
+  .watch-chip:hover{background:rgba(0,212,255,.1);border-color:var(--accent);transform:translateY(-1px);}
   .avoid-chips .watch-chip{color:var(--text2);border-color:var(--border);}
-  .themes-news{margin-top:14px;}
-  .tn-item{display:flex;align-items:baseline;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;}
+  .avoid-chips .watch-chip:hover{background:var(--bg3);border-color:var(--text2);transform:none;cursor:default;}
+
+  /* 新聞區 */
+  .themes-news{margin-top:0;}
+  .tn-item{display:flex;align-items:baseline;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;}
   .tn-item:last-child{border-bottom:none;}
-  .tn-item a{color:var(--text2);text-decoration:none;flex:1;line-height:1.4;}
+  .tn-item a{color:var(--text2);text-decoration:none;flex:1;line-height:1.5;}
   .tn-item a:hover{color:var(--accent);}
-  .tn-source{font-size:10px;color:var(--text2);white-space:nowrap;}
-  .themes-updated{font-size:10px;color:#64748b;text-align:right;margin-top:8px;}
+  .tn-source{font-size:10px;color:var(--text2);white-space:nowrap;background:var(--bg3);padding:1px 6px;border-radius:4px;}
+  .themes-updated{font-size:10px;color:#64748b;text-align:right;margin-top:10px;}
 
   footer{text-align:center;margin-top:40px;color:#64748b;font-size:11px;line-height:2;}
 </style>
@@ -247,12 +320,13 @@
 
 <div class="themes-panel">
   <div class="themes-header">
-    <h2>🔥 熱門題材掃描</h2>
+    <span class="themes-header-icon">🔥</span>
+    <h2>熱門題材掃描</h2>
     <div class="market-switch">
       <button class="mkt-btn active" id="theme-tw-btn" onclick="setThemeMarket('tw')">🇹🇼 台股</button>
       <button class="mkt-btn" id="theme-us-btn" onclick="setThemeMarket('us')">🇺🇸 美股</button>
     </div>
-    <button class="scan-btn" id="scanBtn" onclick="scanThemes()">掃描熱門題材</button>
+    <button class="scan-btn" id="scanBtn" onclick="scanThemes()">⚡ 掃描題材</button>
   </div>
   <div id="themes-result"></div>
 </div>
@@ -657,12 +731,10 @@ async function scanThemes() {
 
 function renderThemes(d) {
   const moodClass = {多方:'mood-bull',盤整:'mood-neutral',偏空:'mood-bear'}[d.market_mood] || 'mood-neutral';
-  const moodIcon = {多方:'📈',盤整:'➡️',偏空:'📉'}[d.market_mood] || '➡️';
+  const moodIcon = {多方:'📈 ',盤整:'➡️ ',偏空:'📉 '}[d.market_mood] || '➡️ ';
 
   const themesHtml = (d.themes || []).map(t => {
-    const heatDots = Array.from({length:10},(_,i)=>
-      `<span class="heat-dot ${i<t.heat?'heat-on':'heat-off'}"></span>`
-    ).join('');
+    const heatFlame = t.heat >= 9 ? '🔥🔥' : t.heat >= 7 ? '🔥' : t.heat >= 5 ? '🌡️' : '❄️';
     const stocksHtml = (t.key_stocks || []).map(s =>
       `<div class="theme-stock" onclick="document.getElementById('stockInput').value='${s.id}';analyze()">
         <span class="ts-id">${s.id}</span>
@@ -673,7 +745,7 @@ function renderThemes(d) {
     return `<div class="theme-card">
       <div class="theme-top">
         <span class="theme-name">${t.name}</span>
-        <div class="theme-heat"><div class="heat-bar">${heatDots}</div><span style="color:var(--yellow);font-weight:700">${t.heat}/10</span></div>
+        <div class="theme-heat-badge"><span class="heat-flame">${heatFlame}</span><span class="heat-score">${t.heat}/10</span></div>
       </div>
       <div class="theme-why">💡 ${t.why_hot}</div>
       <div class="theme-stocks">${stocksHtml}</div>
@@ -703,9 +775,9 @@ function renderThemes(d) {
       <span class="mood-reason">${d.mood_reason||''}</span>
     </div>
     <div class="themes-grid">${themesHtml}</div>
-    ${watchHtml?`<div class="watch-section"><div class="watch-title">📌 值得追蹤（點擊直接分析）</div><div class="watch-chips">${watchHtml}</div></div>`:''}
-    ${avoidHtml?`<div class="watch-section"><div class="watch-title">⚠️ 目前避開族群</div><div class="watch-chips avoid-chips">${avoidHtml}</div></div>`:''}
-    ${newsHtml?`<div class="watch-section themes-news"><div class="watch-title">📰 參考新聞來源</div>${newsHtml}</div>`:''}
+    ${watchHtml?`<div class="watch-section"><div class="watch-title"><span>📌</span> 值得追蹤（點擊直接分析）</div><div class="watch-chips">${watchHtml}</div></div>`:''}
+    ${avoidHtml?`<div class="watch-section"><div class="watch-title"><span>⚠️</span> 目前應避開族群</div><div class="watch-chips avoid-chips">${avoidHtml}</div></div>`:''}
+    ${newsHtml?`<div class="watch-section themes-news"><div class="watch-title"><span>📰</span> 參考新聞來源</div>${newsHtml}</div>`:''}
     <div class="themes-updated">掃描時間：${new Date().toLocaleString('zh-TW')}</div>
   `;
 }
