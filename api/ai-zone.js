@@ -134,11 +134,13 @@ checklist 必須包含這些項目：
 
     const json = await r.json();
     const text = json.content?.[0]?.text || "";
+    // 強化 JSON 解析：清理控制字元和格式問題
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) return res.status(500).json({ error: "AI 回傳格式錯誤", raw: text.slice(0, 200) });
 
-    return res.status(200).json(JSON.parse(match[0]));
-  } catch (e) {
-    return res.status(500).json({ error: e.message });
-  }
-};
+    let jsonStr = match[0];
+    // 移除 JSON 字串外的控制字元，但保留 emoji（不做轉義）
+    // 修復常見 AI JSON 問題：trailing comma
+    jsonStr = jsonStr
+      .replace(/,\s*([}\]])/g, '$1')   // 移除尾部逗號
+      .replace(/[
