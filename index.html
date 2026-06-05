@@ -587,9 +587,10 @@ async function loadFocus(dateVal) {
 function renderFocusTabs(dates, activeVal) {
   focusDates = dates;
   const container = document.getElementById('focus-date-tabs');
-  container.innerHTML = dates.map(d =>
-    `<button class="date-tab${(!activeVal && d === dates[0] || d.value === activeVal) ? ' active' : ''}" onclick="loadFocus('${d.value}')">${d.label}</button>`
-  ).join('');
+  container.innerHTML = dates.map((d, i) => {
+    const isActive = activeVal ? d.value === activeVal : i === 0;
+    return `<button class="date-tab${isActive ? ' active' : ''}" onclick="loadFocus('${d.value}')">${d.label}</button>`;
+  }).join('');
 }
 
 function renderFocusCards(data) {
