@@ -82,7 +82,7 @@ ${newsText}
   "avoid_sectors": ["傳產", "金融股"]
 }
 
-請給3-5個題材，每個2-3檔股票。market_mood只能是多方/盤整/偏空。
+請給3-5個題材，每個2-3檔股票。market_mood只能是多方/盤整/偏空。重要：所有字串值嚴禁包含雙引號、換行、逗號以外的標點符號。
 ${isTW ? '台股用4-6位數字代號。' : '美股用英文代號。'}`;
 
   const controller = new AbortController();
@@ -102,16 +102,18 @@ ${isTW ? '台股用4-6位數字代號。' : '美股用英文代號。'}`;
     const s = text.indexOf("{"), e = text.lastIndexOf("}");
     if (s === -1) throw new Error("AI 未回傳 JSON");
 
-    // ★ 同 ai-zone.js 的強化版清理
+    // ★ 強化版清理（含 Unicode 行分隔符、無效反斜線）
     let jsonStr = text.slice(s, e + 1)
       .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+      .replace(/\u2028|\u2029/g, " ")
       .replace(/\r\n|\r|\n/g, " ")
       .replace(/\t/g, " ")
+      .replace(/\\(?!["\\\/bfnrtu])/g, "")
       .replace(/,(\s*[}\]])/g, "$1");
 
     try { return JSON.parse(jsonStr); }
     catch (parseErr) {
-      console.error("[hot-themes] JSON parse failed:", parseErr.message);
+      console.error("[hot-themes] JSON parse failed:", parseErr.message, "| snippet:", jsonStr.slice(Math.max(0, jsonStr.length-100)));
       throw new Error("AI 回傳格式錯誤，請重試");
     }
   } catch (e) {
