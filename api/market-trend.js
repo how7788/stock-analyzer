@@ -1,7 +1,7 @@
 // api/market-trend.js — 全球大盤即時行情（Yahoo Finance）
 const BASE = "https://query1.finance.yahoo.com/v8/finance/chart";
-
 const MARKETS = [
+  { id: "^TWII",  name: "台灣加權",   abbr: "TAIEX"  },
   { id: "^IXIC",  name: "那斯達克",   abbr: "NASDAQ" },
   { id: "^GSPC",  name: "S&P 500",    abbr: "SPX"    },
   { id: "^SOX",   name: "費城半導體", abbr: "SOX"    },
@@ -39,16 +39,13 @@ module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Content-Type", "application/json");
   if (req.method === "OPTIONS") return res.status(200).end();
-
   const results = await Promise.allSettled(
     MARKETS.map(m => fetchQuote(m.id).then(q => ({ ...m, ...q, error: false })))
   );
-
   const data = results.map((r, i) =>
     r.status === "fulfilled"
       ? r.value
       : { ...MARKETS[i], price: null, change: null, changePct: null, error: true }
   );
-
   return res.status(200).json({ data, updated: new Date().toISOString() });
 };
