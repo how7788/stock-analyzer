@@ -164,10 +164,12 @@ module.exports = async function handler(req, res) {
     if (ma240arr[n-1] != null) maPos.push(p > ma240arr[n-1] ? `站上年線（${ma240arr[n-1]}）`   : `跌破年線（${ma240arr[n-1]}）`);
 
     let valuation = null;
+    let stockNameFromPer = null;
     try {
       const perRaw = await finmindFetch("TaiwanStockPER", cleanId, daysAgo(10));
       if (perRaw?.length > 0) {
         const last = perRaw[perRaw.length - 1];
+        stockNameFromPer = last.stock_name || null;
         valuation = { date: last.date, per: last.PER != null ? Math.round(last.PER * 10) / 10 : null, pbr: last.PBR != null ? Math.round(last.PBR * 100) / 100 : null, yield: last.dividend_yield != null ? Math.round(last.dividend_yield * 100) / 100 : null };
       }
     } catch (_) {}
@@ -214,7 +216,7 @@ module.exports = async function handler(req, res) {
     });
 
     return res.status(200).json({
-      stock_id: cleanId, name: latest.stock_name || cleanId,
+      stock_id: cleanId, name: latest.stock_name || stockNameFromPer || cleanId,
       market: 'tw', updated: latest.date,
       data_note: '資料來源：FinMind，可能非即時報價',
       price: { close: p, open: parseFloat(latest.open), high: parseFloat(latest.max), low: parseFloat(latest.min), volume: parseInt(latest.Trading_Volume || 0), change_percent: changePct },
