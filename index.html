@@ -636,13 +636,18 @@ function renderTickers(data, updated) {
     const arrow = up ? '↗' : down ? '↘' : '→';
     const cs = up ? '+' : '';
     const priceStr = m.price >= 10000 ? m.price.toLocaleString('en', {maximumFractionDigits:2}) : m.price.toFixed(2);
+    const ma20Str = m.ma20 != null ? (m.ma20 >= 10000 ? m.ma20.toLocaleString('en', {maximumFractionDigits:0}) : m.ma20.toFixed(2)) : null;
+    const aboveMa = m.ma20 != null ? m.price > m.ma20 : null;
     return `<div class="ticker-card">
       <div class="ticker-top">
         <span class="ticker-name">${m.name}</span>
         <span class="ticker-change ${cc}">${arrow} ${cs}${m.change}</span>
       </div>
       <div class="ticker-price">${priceStr}</div>
-      <div class="ticker-pct"><span class="ticker-change ${cc}">${cs}${m.changePct}%</span></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <span class="ticker-pct"><span class="ticker-change ${cc}">${cs}${m.changePct}%</span></span>
+        ${ma20Str ? `<span style="font-size:10px;color:var(--text3);">月線 <span style="font-family:'JetBrains Mono',monospace;color:${aboveMa ? 'var(--green)' : 'var(--red)'};">${ma20Str}</span></span>` : ''}
+      </div>
     </div>`;
   }).join('');
   if (updated) {
