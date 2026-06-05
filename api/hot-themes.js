@@ -92,7 +92,7 @@ ${isTW ? '台股用4-6位數字代號。' : '美股用英文代號。'}`;
     const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST", signal: controller.signal,
       headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 1200, messages: [{ role: "user", content: prompt }] }),
+      body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1200, messages: [{ role: "user", content: prompt }] }),
     });
     clearTimeout(timeout);
     if (!r.ok) throw new Error(`Claude API 錯誤 ${r.status}`);
