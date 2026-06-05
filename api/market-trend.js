@@ -11,7 +11,7 @@ const MARKETS = [
 ];
 
 async function fetchQuote(symbol) {
-  const url = `${BASE}/${encodeURIComponent(symbol)}?interval=1d&range=5d&includePrePost=false`;
+  const url = `${BASE}/${encodeURIComponent(symbol)}?interval=1d&range=30d&includePrePost=false`;
   const res = await fetch(url, {
     headers: {
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -29,7 +29,16 @@ async function fetchQuote(symbol) {
   if (!price || !prev) throw new Error("No price");
   const change = Math.round((price - prev) * 100) / 100;
   const changePct = Math.round((price - prev) / prev * 10000) / 100;
-  return { price, change, changePct, prev };
+
+  // 計算月線 MA20
+  const closes = (result.indicators?.quote?.[0]?.close || []).filter(v => v != null);
+  let ma20 = null;
+  if (closes.length >= 20) {
+    const slice = closes.slice(-20);
+    ma20 = Math.round(slice.reduce((a, v) => a + v, 0) / 20 * 100) / 100;
+  }
+
+  return { price, change, changePct, prev, ma20 };
 }
 
 module.exports = async function handler(req, res) {
