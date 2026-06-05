@@ -1,4 +1,4 @@
-// api/hot-themes.js — 熱門題材掃描（移除 FinMind 大量抓取，避免 timeout）
+// api/hot-themes.js — 熱門題材掃描
 async function searchThemeNews(tavilyKey, market) {
   const isUS = market === 'us';
   const queries = isUS
@@ -21,13 +21,9 @@ async function searchThemeNews(tavilyKey, market) {
         headers: { "Content-Type": "application/json" },
         signal: controller.signal,
         body: JSON.stringify({
-          api_key: tavilyKey,
-          query: q,
-          search_depth: "basic",
-          max_results: 5,
-          days: 7,
-          include_answer: false,
-          include_raw_content: false,
+          api_key: tavilyKey, query: q,
+          search_depth: "basic", max_results: 5, days: 7,
+          include_answer: false, include_raw_content: false,
         }),
       }).then(r => r.json()).catch(() => ({ results: [] }))
     ));
@@ -37,25 +33,20 @@ async function searchThemeNews(tavilyKey, market) {
     const articles = [];
     for (const r of results) {
       for (const item of (r.results || [])) {
-        const url = item.url || '';
-        const content = item.content || '';
+        const url = item.url || '', content = item.content || '';
         if (!seen.has(url) && content.length > 80) {
           seen.add(url);
           articles.push({
-            title: item.title,
-            url,
+            title: item.title, url,
             snippet: content.slice(0, 200),
-            source: (() => { try { return new URL(url).hostname.replace('www.',''); } catch(_) { return ''; } })(),
+            source: (() => { try { return new URL(url).hostname.replace('www.', ''); } catch (_) { return ''; } })(),
             published: item.published_date || null,
           });
         }
       }
     }
     return articles.slice(0, 8);
-  } catch (_) {
-    clearTimeout(timeout);
-    return [];
-  }
+  } catch (_) { clearTimeout(timeout); return []; }
 }
 
 async function analyzeWithClaude(apiKey, market, articles) {
@@ -69,7 +60,7 @@ async function analyzeWithClaude(apiKey, market, articles) {
 近期新聞：
 ${newsText}
 
-只輸出以下 JSON，不要其他文字，所有字串不含雙引號或換行：
+只輸出以下 JSON，不要其他文字，所有字串值不含雙引號或換行符號：
 {
   "updated": "${new Date().toLocaleDateString('zh-TW')}",
   "market_mood": "多方",
@@ -99,36 +90,31 @@ ${isTW ? '台股用4-6位數字代號。' : '美股用英文代號。'}`;
 
   try {
     const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      signal: controller.signal,
+      method: "POST", signal: controller.signal,
       headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 1200,
-        messages: [{ role: "user", content: prompt }],
-      }),
+      body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 1200, messages: [{ role: "user", content: prompt }] }),
     });
     clearTimeout(timeout);
     if (!r.ok) throw new Error(`Claude API 錯誤 ${r.status}`);
 
     const json = await r.json();
-    let text = (json.content?.[0]?.text || "")
-      .replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
-
+    let text = (json.content?.[0]?.text || "").replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
     const s = text.indexOf("{"), e = text.lastIndexOf("}");
     if (s === -1) throw new Error("AI 未回傳 JSON");
 
+    // ★ 同 ai-zone.js 的強化版清理
     let jsonStr = text.slice(s, e + 1)
-      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "")
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
+      .replace(/\r\n|\r|\n/g, " ")
+      .replace(/\t/g, " ")
       .replace(/,(\s*[}\]])/g, "$1");
 
     try { return JSON.parse(jsonStr); }
-    catch(_) {
-      jsonStr = jsonStr.replace(/\r\n/g," ").replace(/\r/g," ").replace(/\n/g," ");
-      jsonStr = jsonStr.replace(/,(\s*[}\]])/g, "$1");
-      return JSON.parse(jsonStr);
+    catch (parseErr) {
+      console.error("[hot-themes] JSON parse failed:", parseErr.message);
+      throw new Error("AI 回傳格式錯誤，請重試");
     }
-  } catch(e) {
+  } catch (e) {
     clearTimeout(timeout);
     throw e;
   }
