@@ -6,7 +6,6 @@ const MARKETS = [
   { id: "^GSPC",  name: "S&P 500",    abbr: "SPX"    },
   { id: "^SOX",   name: "費城半導體", abbr: "SOX"    },
   { id: "TSM",    name: "台積電 ADR", abbr: "TSM"    },
-  { id: "NVDA",   name: "輝達 NVDA",  abbr: "NVDA"   },
   { id: "^N225",  name: "日経 225",   abbr: "N225"   },
   { id: "^KS11",  name: "韓國綜合",   abbr: "KOSPI"  },
   { id: "^VIX",   name: "VIX 恐慌",  abbr: "VIX"    },
