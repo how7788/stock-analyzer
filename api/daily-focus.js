@@ -1,4 +1,4 @@
-// api/daily-focus.js — 每日產業焦點導航
+// api/daily-focus.js — 每日產業焦點導航（今日 + 昨日）
 
 const SOURCE_MAP = {
   'cnyes.com': '鉅亨網', 'moneydj.com': 'MoneyDJ', 'cmoney.tw': 'CMoney',
@@ -6,6 +6,7 @@ const SOURCE_MAP = {
   'ettoday.net': 'ETtoday', 'ctee.com.tw': '工商時報', 'businesstoday.com.tw': '今周刊',
   'technews.tw': '科技新報', 'digitimes.com.tw': 'Digitimes', 'newtalk.tw': '新頭殼',
   'today.line.me': 'LINE TODAY', 'ec.ltn.com.tw': '自由財經', 'wealth.com.tw': '財訊',
+  'anuefund.com': 'anuefund', 'growin.com': 'Growin', 'mic.org.tw': '資策會MIC',
 };
 
 function getSource(url) {
@@ -19,11 +20,12 @@ function getSource(url) {
   } catch (_) { return '財經媒體'; }
 }
 
-async function fetchNews(tavilyKey) {
+// daysParam: 1 = 今日（近24h），2 = 昨日（近48h）
+async function fetchNews(tavilyKey, daysParam) {
   const queries = [
-    "台股 AI伺服器 半導體 強勢族群 產業焦點 2026",
-    "台積電 聯發科 鴻海 廣達 最新消息 今日",
-    "台股 資金輪動 題材 法人買賣 今日重點",
+    "台股 AI伺服器 半導體 強勢族群 產業焦點",
+    "台積電 聯發科 鴻海 廣達 最新消息",
+    "台股 資金輪動 題材 法人買賣 重點",
   ];
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 9000);
@@ -35,7 +37,8 @@ async function fetchNews(tavilyKey) {
         signal: controller.signal,
         body: JSON.stringify({
           api_key: tavilyKey, query: q,
-          search_depth: "basic", max_results: 5, days: 2,
+          search_depth: "basic", max_results: 5,
+          days: daysParam,   // ← 今日=1，昨日=2
         }),
       }).then(r => r.json()).catch(() => ({ results: [] }))
     ));
@@ -47,7 +50,10 @@ async function fetchNews(tavilyKey) {
         const url = item.url || '', content = item.content || '';
         if (!seen.has(url) && content.length > 100) {
           seen.add(url);
-          articles.push({ title: item.title || '', url, snippet: content.slice(0, 400), source: getSource(url), published: item.published_date || null });
+          articles.push({
+            title: item.title || '', url, snippet: content.slice(0, 400),
+            source: getSource(url), published: item.published_date || null,
+          });
         }
       }
     }
@@ -58,7 +64,7 @@ async function fetchNews(tavilyKey) {
 async function analyzeWithClaude(apiKey, articles, targetDate) {
   const newsText = articles.length
     ? articles.map((a, i) => `[${i + 1}] 來源:${a.source}\n標題:${a.title}\n內容:${a.snippet}`).join('\n\n')
-    : '（今日無新聞，請根據近期市場知識生成）';
+    : '（無新聞，請根據近期市場知識生成）';
 
   const prompt = `你是台股產業分析師。根據以下近期新聞，整理出${targetDate}最重要的4個產業焦點，每個聚焦一個核心題材與族群。
 
@@ -76,32 +82,11 @@ ${newsText}
       "summary": "AI客戶持續拉貨推升台積電先進製程稼動率至高位，CoWoS等先進封裝產能同步供不應求。法人預估2026年先進製程收入佔比將超過六成，晶圓代工主線結構受惠確立。",
       "sectors": ["晶圓代工", "AI先進封裝"],
       "color": "blue"
-    },
-    {
-      "source": "鉅亨網",
-      "title": "AI伺服器ODM供應鏈資金全面聚焦",
-      "summary": "廣達緯創鴻海等ODM廠受GB200出貨訂單帶動強勢表現，資金同步擴散至散熱模組與機殼周邊族群。市場預期AI伺服器規格升級延續性將支撐供應鏈整段行情。",
-      "sectors": ["AI伺服器組裝", "散熱模組"],
-      "color": "green"
-    },
-    {
-      "source": "科技新報",
-      "title": "DRAM報價預期走升，模組記憶體領漲",
-      "summary": "AI應用拉動DRAM及NAND需求，南亞科華邦電等一般型DRAM族群強勢表現。資金從HBM高頻寬記憶體擴散至利基記憶體模組，群聯威剛等受模組報價支撐同步走升。",
-      "sectors": ["記憶體模組", "利基記憶體"],
-      "color": "amber"
-    },
-    {
-      "source": "工商時報",
-      "title": "關稅談判進展，IC通路半導體設備出貨暢旺",
-      "summary": "全球貿易協議談判持續推進，轉單具全球市占的半導體零組件廠商IC通路商與晶圓廠設備商受惠，出口市場資金轉向核心供應鏈護城河標的。",
-      "sectors": ["IC通路", "晶圓廠設備"],
-      "color": "purple"
     }
   ]
 }
 
-規則：cards固定4個，涵蓋不同產業面向；source用實際新聞來源；summary約100字；sectors2-3個台股習慣板塊名稱；color從blue/green/amber/purple/red/teal選一個。`;
+規則：cards 固定4個，涵蓋不同產業面向；source 用實際新聞來源；summary 約100字；sectors 2-3個台股板塊名稱；color 從 blue/green/amber/purple/red/teal 選一個。`;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 22000);
@@ -117,27 +102,41 @@ ${newsText}
     let text = (json.content?.[0]?.text || '').replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
     const s = text.indexOf('{'), e = text.lastIndexOf('}');
     if (s === -1) throw new Error('No JSON');
-    let str = text.slice(s, e + 1).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '').replace(/,(\s*[}\]])/g, '$1');
+    let str = text.slice(s, e + 1)
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+      .replace(/\r\n|\r|\n/g, ' ')
+      .replace(/\t/g, ' ')
+      .replace(/,(\s*[}\]])/g, '$1');
     try { return JSON.parse(str); }
     catch (_) { return JSON.parse(str.replace(/[\r\n]/g, ' ')); }
   } catch (e) { clearTimeout(timer); throw e; }
 }
 
 function getAvailableDates() {
-  const dates = [];
-  const d = new Date();
-  let count = 0;
-  while (count < 7) {
-    const day = d.getDay();
-    if (day !== 0 && day !== 6) {
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
-      dates.push({ label: count === 0 ? '今日' : `${m}/${dd}`, value: `${d.getFullYear()}-${m}-${dd}` });
-      count++;
-    }
-    d.setDate(d.getDate() - 1);
-  }
-  return dates;
+  const fmt = d => {
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return { label: `${m}/${dd}`, value: `${d.getFullYear()}-${m}-${dd}` };
+  };
+
+  // 今日（跳過週末找最近交易日）
+  const today = new Date();
+  const getTradeDay = (offset) => {
+    const d = new Date(today);
+    d.setDate(d.getDate() + offset);
+    // 往前找最近的工作日
+    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1);
+    return d;
+  };
+
+  const d0 = getTradeDay(0);
+  const d1 = new Date(d0); d1.setDate(d1.getDate() - 1);
+  while (d1.getDay() === 0 || d1.getDay() === 6) d1.setDate(d1.getDate() - 1);
+
+  return [
+    { label: '今日', value: fmt(d0).value, days: 1 },
+    { label: '前日', value: fmt(d1).value, days: 2 },
+  ];
 }
 
 module.exports = async function handler(req, res) {
@@ -151,10 +150,14 @@ module.exports = async function handler(req, res) {
   if (!tavilyKey || !anthropicKey) return res.status(500).json({ error: "缺少 API Key" });
 
   const dates = getAvailableDates();
-  const requestDate = req.query.date || dates[0]?.value;
+  const requestDate = req.query.date || dates[0].value;
+
+  // 找對應的 daysParam（今日=1，前日=2）
+  const matched = dates.find(d => d.value === requestDate);
+  const daysParam = matched ? matched.days : 1;
 
   try {
-    const articles = await fetchNews(tavilyKey);
+    const articles = await fetchNews(tavilyKey, daysParam);
     const analysis = await analyzeWithClaude(anthropicKey, articles, requestDate);
     return res.status(200).json({ ...analysis, available_dates: dates });
   } catch (err) {
