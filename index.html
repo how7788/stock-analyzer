@@ -51,7 +51,7 @@ section{margin-bottom:32px;}
 .section-sub{font-size:12px;color:var(--text2);margin-top:2px;display:flex;align-items:center;gap:5px;}
 
 /* ── Market Tickers ── */
-.tickers-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.tickers-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
 @media(max-width:900px){.tickers-grid{grid-template-columns:repeat(2,1fr);}}
 @media(max-width:480px){.tickers-grid{grid-template-columns:repeat(2,1fr);}}
 .ticker-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow);transition:box-shadow .2s;}
@@ -378,10 +378,9 @@ section{margin-bottom:32px;}
     </div>
   </div>
   <div class="tickers-grid" id="tickers-grid">
-    <div class="ticker-skeleton"></div><div class="ticker-skeleton"></div>
-    <div class="ticker-skeleton"></div><div class="ticker-skeleton"></div>
-    <div class="ticker-skeleton"></div><div class="ticker-skeleton"></div>
-    <div class="ticker-skeleton"></div><div class="ticker-skeleton"></div>
+    <div class="ticker-skeleton"></div><div class="ticker-skeleton"></div><div class="ticker-skeleton"></div>
+    <div class="ticker-skeleton"></div><div class="ticker-skeleton"></div><div class="ticker-skeleton"></div>
+    <div class="ticker-skeleton"></div><div class="ticker-skeleton"></div><div class="ticker-skeleton"></div>
   </div>
   <div class="tickers-updated" id="tickers-updated"></div>
 </section>
