@@ -746,7 +746,7 @@ function renderWatchlist() {
           <div style="display:flex;align-items:center;gap:6px;">
             <span class="wl-id" style="font-size:14px;font-weight:700;color:var(--text);font-family:'JetBrains Mono',monospace;">${w.id}</span>
           </div>
-          <div style="font-size:11px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;cursor:pointer;" onclick="quickSearch('${w.id}')">${w.name !== w.id ? w.name : ''}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;cursor:pointer;min-height:14px;" onclick="quickSearch('${w.id}')">${w.name !== w.id ? w.name : ''}</div>
         </div>
         <button class="wl-remove" onclick="removeFromWatchlist('${w.id}')" title="移除">×</button>
       </div>
