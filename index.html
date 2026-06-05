@@ -348,6 +348,80 @@ section{margin-bottom:32px;}
 @keyframes spin{to{transform:rotate(360deg);}}
 .error-box{background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);border-radius:var(--radius);padding:14px 18px;color:var(--red);font-size:13px;}
 .updated-tag{font-size:11px;color:var(--text3);text-align:right;margin-top:4px;}
+
+/* ═══════════════════════════════════════════
+   MOBILE ONLY (≤ 640px) — 桌機完全不受影響
+   ═══════════════════════════════════════════ */
+@media (max-width: 640px) {
+  /* Header：縮小、隱藏「搜尋市場」文字、旗子按鈕變小 */
+  .header-inner { padding: 0 10px; gap: 6px; height: 52px; }
+  .logo { font-size: 14px; }
+  .logo-dot { width: 6px; height: 6px; }
+  .header-search input { font-size: 13px; padding: 7px 10px; }
+  .btn-primary { padding: 7px 12px; font-size: 13px; }
+  .header-mkt-tabs > span { display: none; }
+  .mkt-tab { padding: 4px 7px; font-size: 11px; }
+
+  /* Page padding */
+  .page-wrap { padding: 0 10px 32px; }
+  section { margin-bottom: 20px; }
+
+  /* Section header 縮小 */
+  .section-icon { width: 26px; height: 26px; font-size: 13px; }
+  .section-label { font-size: 15px; }
+  .section-sub { font-size: 11px; }
+
+  /* 大盤行情：手機固定 2 欄 */
+  .tickers-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; max-width: none; }
+  .ticker-price { font-size: 16px; }
+  .ticker-card { padding: 10px 12px; }
+
+  /* 產業焦點：手機 1 欄 */
+  .focus-cards { grid-template-columns: 1fr; gap: 10px; }
+  .focus-card { padding: 12px; }
+  .focus-title { font-size: 13px; }
+  .focus-summary { font-size: 11px; }
+
+  /* 熱門題材：掃描狀態文字換行 */
+  .themes-market-row { flex-wrap: wrap; gap: 6px; }
+  #scan-status-text { width: 100%; margin-top: 2px; }
+  .scan-btn { padding: 7px 14px; font-size: 12px; }
+
+  /* 快捷按鈕：橫向捲動，不換行 */
+  .quick-btns { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .quick-btns::-webkit-scrollbar { display: none; }
+  .quick-btn { white-space: nowrap; flex-shrink: 0; font-size: 11px; padding: 5px 9px; }
+
+  /* 個股結果卡片 */
+  .price-main { font-size: 28px; }
+  .ind-grid { grid-template-columns: repeat(2, 1fr); }
+  .bz-grid { grid-template-columns: repeat(2, 1fr); }
+  .batches-grid { grid-template-columns: 1fr; }
+  .checklist { grid-template-columns: 1fr; }
+  .factors-grid { grid-template-columns: 1fr; }
+
+  /* 比較模式 */
+  .compare-grid { grid-template-columns: 1fr; }
+
+  /* 自選股 */
+  .watchlist-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .watchlist-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .btn-refresh-all { width: 100%; }
+
+  /* 走勢圖 range 按鈕 */
+  .chart-header { flex-direction: column; align-items: flex-start; gap: 6px; }
+
+  /* 頁尾 */
+  footer { font-size: 10px; padding: 14px 0; }
+}
+
+@media (max-width: 380px) {
+  /* 極窄螢幕（iPhone SE 等） */
+  .tickers-grid { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  .ticker-price { font-size: 14px; }
+  .watchlist-grid { grid-template-columns: 1fr; }
+}
+
 </style>
 </head>
 <body>
