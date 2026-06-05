@@ -25,13 +25,14 @@ async function fetchQuote(symbol) {
   if (!result) throw new Error("No data");
   const meta = result.meta;
   const price = meta.regularMarketPrice;
-  const prev = meta.previousClose ?? meta.chartPreviousClose;
+  // ★ 一定用 previousClose（前一交易日收盤），不用 chartPreviousClose（range 起點價格）
+  const closes = (result.indicators?.quote?.[0]?.close || []).filter(v => v != null);
+  const prev = meta.previousClose ?? (closes.length >= 2 ? closes[closes.length - 2] : null);
   if (!price || !prev) throw new Error("No price");
   const change = Math.round((price - prev) * 100) / 100;
   const changePct = Math.round((price - prev) / prev * 10000) / 100;
 
   // 計算月線 MA20
-  const closes = (result.indicators?.quote?.[0]?.close || []).filter(v => v != null);
   let ma20 = null;
   if (closes.length >= 20) {
     const slice = closes.slice(-20);
