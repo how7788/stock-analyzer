@@ -646,7 +646,7 @@ function renderTickers(data, updated) {
       <div class="ticker-price">${priceStr}</div>
       <div style="display:flex;align-items:center;justify-content:space-between;">
         <span class="ticker-pct"><span class="ticker-change ${cc}">${cs}${m.changePct}%</span></span>
-        ${ma20Str ? `<span style="font-size:10px;color:var(--text3);">月線 <span style="font-family:'JetBrains Mono',monospace;color:${aboveMa ? 'var(--green)' : 'var(--red)'};">${ma20Str}</span></span>` : ''}
+        ${ma20Str ? `<span style="font-size:10px;color:var(--text3);">月線 <span style="font-family:'JetBrains Mono',monospace;color:var(--text2);">${ma20Str}</span></span>` : ''}
       </div>
     </div>`;
   }).join('');
