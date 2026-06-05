@@ -9,7 +9,7 @@
 <style>
 :root{
   --bg:#f0f2f5;--card:#fff;--card2:#f8f9fb;--border:#e5e7eb;
-  --text:#1a1a2e;--text2:#6b7280;--text3:#9ca3af;
+  --text:#1a1a2e;--text2:#6b7280;--text3:#6b7280;
   --green:#10b981;--red:#ef4444;--blue:#3b82f6;--yellow:#f59e0b;
   --purple:#8b5cf6;--teal:#14b8a6;--orange:#f97316;
   --radius:12px;--shadow:0 1px 3px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.04);
@@ -34,9 +34,10 @@ section{margin-bottom:32px;}
 .header-search input{flex:1;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:14px;background:var(--card2);color:var(--text);outline:none;transition:border-color .2s;}
 .header-search input:focus{border-color:var(--blue);}
 .header-search input::placeholder{color:var(--text3);}
-.btn-primary{background:var(--blue);border:none;border-radius:8px;padding:8px 16px;color:#fff;font-size:14px;font-weight:500;transition:opacity .2s;white-space:nowrap;}
-.btn-primary:hover{opacity:.85;}
-.btn-primary:disabled{opacity:.5;cursor:not-allowed;}
+.btn-primary{background:var(--blue);border:none;border-radius:8px;padding:8px 16px;color:#fff;font-size:14px;font-weight:500;transition:all .2s;white-space:nowrap;}
+.btn-primary:hover{opacity:.88;transform:translateY(-1px);}
+.btn-primary:active{opacity:1;transform:translateY(0);}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed;transform:none;}
 .header-mkt-tabs{display:flex;gap:4px;}
 .mkt-tab{background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;color:var(--text2);transition:all .2s;}
 .mkt-tab.tw.active{background:rgba(239,68,68,.08);border-color:var(--red);color:var(--red);}
@@ -62,6 +63,8 @@ section{margin-bottom:32px;}
 .ticker-change.up{color:var(--green);}
 .ticker-change.down{color:var(--red);}
 .ticker-change.flat{color:var(--text3);}
+.ticker-change.vix-up{color:var(--orange);}
+.ticker-change.vix-down{color:var(--green);}
 .ticker-price{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:600;color:var(--text);letter-spacing:-.5px;}
 .ticker-pct{font-size:12px;color:var(--text2);margin-top:2px;}
 .tickers-updated{text-align:right;font-size:11px;color:var(--text3);margin-top:8px;}
@@ -357,7 +360,8 @@ section{margin-bottom:32px;}
       <input id="stockInput" type="text" placeholder="台股 2330 或美股 AAPL" autocomplete="off" oninput="detectMarket()" onkeydown="if(event.key==='Enter')analyze()">
       <button class="btn-primary" id="searchBtn" onclick="analyze()">分析</button>
     </div>
-    <div class="header-mkt-tabs">
+    <div class="header-mkt-tabs" title="設定搜尋市場">
+      <span style="font-size:10px;color:var(--text3);margin-right:4px;">搜尋市場</span>
       <button class="mkt-tab tw" id="tab-tw" onclick="setInputMkt('tw')">🇹🇼 台股</button>
       <button class="mkt-tab us" id="tab-us" onclick="setInputMkt('us')">🇺🇸 美股</button>
     </div>
@@ -419,10 +423,15 @@ section{margin-bottom:32px;}
   </div>
   <div class="themes-wrap">
     <div class="themes-market-row">
+      <span style="font-size:11px;color:var(--text2);margin-right:4px;">掃描市場：</span>
       <button class="mkt-btn active" id="theme-tw-btn" onclick="setThemeMarket('tw')">🇹🇼 台股</button>
       <button class="mkt-btn" id="theme-us-btn" onclick="setThemeMarket('us')">🇺🇸 美股</button>
-      <button class="scan-btn" id="scanBtn" onclick="scanThemes()">⚡ 掃描題材</button>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+        <span id="scan-status-text" style="font-size:11px;color:var(--text3);"></span>
+        <button class="scan-btn" id="scanBtn" onclick="scanThemes()">⚡ 掃描題材</button>
+      </div>
     </div>
+    <div id="scan-preview" style="display:none;"></div>
     <div id="themes-result"></div>
   </div>
 </section>
@@ -434,17 +443,17 @@ section{margin-bottom:32px;}
       <div class="section-icon">📌</div>
       <div>
         <div class="section-label">我的自選股</div>
-        <div class="section-sub">最多 20 檔，台股 + 美股混合，一鍵批次更新</div>
+        <div class="section-sub">支援台股與美股，最多 20 檔，一鍵批次更新</div>
       </div>
     </div>
   </div>
   <div class="watchlist-wrap">
     <div class="watchlist-header">
       <div class="watchlist-input-row">
-        <input class="watchlist-input" id="wlInput" placeholder="代號 e.g. 2330" onkeydown="if(event.key==='Enter')addToWatchlist()">
+        <input class="watchlist-input" id="wlInput" placeholder="輸入代號，如 2330、AAPL" onkeydown="if(event.key==='Enter')addToWatchlist()">
         <button class="btn-add" onclick="addToWatchlist()">＋ 新增</button>
       </div>
-      <button class="btn-refresh-all" onclick="refreshAllWatchlist()">↺ 重整全部</button>
+      <button class="btn-refresh-all" id="btn-refresh-all" onclick="refreshAllWatchlist()">↺ 重整全部</button>
     </div>
     <div id="watchlist-area"><div class="watchlist-empty">尚未加入任何股票。輸入代號後按「+ 新增」。</div></div>
   </div>
@@ -545,8 +554,10 @@ function renderTickers(data, updated) {
     if (m.error || m.price == null) {
       return `<div class="ticker-card"><div class="ticker-top"><span class="ticker-name">${m.name}</span></div><div class="ticker-price" style="color:var(--text3)">—</div></div>`;
     }
+    // VIX 上漲 = 恐慌升高，用橘色而非綠色
+    const isVix = m.abbr === 'VIX';
     const up = m.changePct > 0, down = m.changePct < 0;
-    const cc = up ? 'up' : down ? 'down' : 'flat';
+    const cc = isVix ? (up ? 'vix-up' : down ? 'vix-down' : 'flat') : (up ? 'up' : down ? 'down' : 'flat');
     const arrow = up ? '↗' : down ? '↘' : '→';
     const cs = up ? '+' : '';
     const priceStr = m.price >= 10000 ? m.price.toLocaleString('en', {maximumFractionDigits:2}) : m.price.toFixed(2);
@@ -579,7 +590,11 @@ async function loadFocus(dateVal) {
     if (data.available_dates && data.available_dates.length) renderFocusTabs(data.available_dates, dateVal);
     renderFocusCards(data);
   } catch(e) {
-    area.innerHTML = `<div class="error-box">產業焦點暫時無法載入：${e.message}</div>`;
+    area.innerHTML = `<div style="text-align:center;padding:32px;color:var(--text2);font-size:13px;">
+      <div style="font-size:20px;margin-bottom:8px;">⚠️</div>
+      無法取得產業焦點資料，請重新整理或稍後再試。
+      <br><button onclick="loadFocus(null)" style="margin-top:10px;background:none;border:1px solid var(--border);border-radius:6px;padding:5px 14px;font-size:12px;cursor:pointer;color:var(--text2);">重新載入</button>
+    </div>`;
   }
 }
 
@@ -594,6 +609,10 @@ function renderFocusTabs(dates, activeVal) {
 
 function renderFocusCards(data) {
   const colorMap = { blue:'badge-blue', green:'badge-green', amber:'badge-amber', purple:'badge-purple', red:'badge-red', teal:'badge-teal', orange:'badge-orange' };
+  if (!data.cards || !data.cards.length) {
+    document.getElementById('focus-cards-area').innerHTML = '<div style="text-align:center;padding:32px;color:var(--text2);font-size:13px;">今日尚無產業焦點資料，請稍後再試。</div>';
+    return;
+  }
   const cards = (data.cards || []).map(c => {
     const bc = colorMap[c.color] || 'badge-gray';
     const sectors = (c.sectors || []).map(s => `<span class="sector-tag">${s}</span>`).join('');
@@ -631,6 +650,8 @@ function removeFromWatchlist(id) {
 
 function renderWatchlist() {
   const area = document.getElementById('watchlist-area');
+  const refreshBtn = document.getElementById('btn-refresh-all');
+  if (refreshBtn) { refreshBtn.disabled = !watchlist.length; refreshBtn.style.opacity = watchlist.length ? '' : '0.4'; refreshBtn.style.cursor = watchlist.length ? '' : 'not-allowed'; }
   if (!watchlist.length) { area.innerHTML = '<div class="watchlist-empty">尚未加入任何股票。輸入代號後按「+ 新增」。</div>'; return; }
   const cards = watchlist.map(w => {
     const us = /^[A-Za-z]/.test(w.id);
@@ -814,6 +835,11 @@ async function analyze() {
     renderResult(data);
     fetchAIZone(data);
     fetchNews(data);
+    // 4. 搜尋後自動跳到結果
+    setTimeout(() => {
+      const el = document.getElementById('result');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 150);
   } catch(e) {
     result.innerHTML = `<div class="error-box">⚠️ ${e.message}</div>`;
   } finally {
@@ -821,17 +847,62 @@ async function analyze() {
   }
 }
 
+let _lastAIData = null;
+
+function generateFallbackSummary(data) {
+  const ind = data.indicators || {}, sig = data.signal || {};
+  const lines = [];
+  if (ind.ma20 && ind.ma60) lines.push(ind.ma20 > ind.ma60 ? '月線站上季線，短中期偏多排列。' : '月線跌破季線，短中期偏空排列。');
+  if (ind.rsi != null) lines.push(ind.rsi < 40 ? `RSI ${ind.rsi} 低檔，超賣區有反彈空間。` : ind.rsi > 70 ? `RSI ${ind.rsi} 高檔，短線注意壓力。` : `RSI ${ind.rsi} 中性區間。`);
+  if (ind.macd_hist != null) lines.push(ind.macd_hist > 0 ? 'MACD 柱狀為正，動能偏多。' : 'MACD 柱狀為負，動能偏空。');
+  if (ind.month_k != null) lines.push(ind.month_k < 25 ? `月KD K值 ${ind.month_k}，長線低檔。` : ind.month_k > 75 ? `月KD K值 ${ind.month_k}，長線高檔留意。` : '');
+  if (sig.summary) lines.push(sig.summary);
+  return lines.filter(Boolean).join(' ') || '技術指標資料已載入，請參考均線與動能指標。';
+}
+
 async function fetchAIZone(data) {
+  _lastAIData = data;
   const el = document.getElementById('ai-zone-placeholder');
   if (!el) return;
   const cur = data.currency || (data.market === 'us' ? 'USD' : 'TWD');
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 55000);
   try {
-    const res = await fetch('/api/ai-zone', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    const res = await fetch('/api/ai-zone', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data), signal: controller.signal
+    });
+    clearTimeout(timer);
     const bz = await res.json();
     if (!res.ok) throw new Error(bz.error || 'AI 分析失敗');
     el.outerHTML = renderBuyZoneHTML(bz, cur);
   } catch(e) {
-    if (el) el.innerHTML = `<div style="padding:12px;color:var(--text2);font-size:12px">AI 分析暫時不可用：${e.message}</div>`;
+    clearTimeout(timer);
+    const isTimeout = e.name === 'AbortError';
+    const fallback = generateFallbackSummary(data);
+    if (el) el.innerHTML = `
+      <div style="padding:14px 18px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+          <span style="font-size:10px;background:rgba(245,158,11,.1);color:var(--yellow);padding:2px 8px;border-radius:20px;font-weight:700;">${isTimeout ? 'TIMEOUT' : 'ERROR'}</span>
+          <span style="font-size:13px;font-weight:600;color:var(--text);">AI 技術面評估</span>
+        </div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">
+          ${isTimeout ? 'AI 分析逾時，已先顯示技術指標資料。你可以稍後重新分析。' : 'AI 分析暫時不可用，以下為技術指標摘要。'}
+        </div>
+        <div style="font-size:13px;color:var(--text);line-height:1.7;padding:10px 12px;background:var(--card2);border-radius:8px;margin-bottom:10px;">${fallback}</div>
+        <button onclick="reanalyzeAI()" style="background:var(--blue);border:none;border-radius:8px;padding:7px 16px;color:#fff;font-size:12px;font-weight:500;cursor:pointer;">↺ 重新分析</button>
+      </div>`;
+  }
+}
+
+function reanalyzeAI() {
+  if (!_lastAIData) return;
+  const existing = document.getElementById('ai-zone-placeholder') || document.querySelector('.buy-zone-card');
+  if (existing) {
+    existing.id = 'ai-zone-placeholder';
+    existing.className = 'buy-zone-card';
+    existing.innerHTML = '<div class="bz-header"><span class="ai-badge">AI</span><span class="bz-title">中長期技術面評估</span></div><div class="ai-loading">AI 重新分析中…</div>';
+    fetchAIZone(_lastAIData);
   }
 }
 
@@ -843,7 +914,7 @@ async function fetchNews(data) {
     const res = await fetch('/api/news?' + params);
     const json = await res.json();
     if (!res.ok) throw new Error(json.error || '新聞載入失敗');
-    el.outerHTML = renderNewsHTML(json.articles || [], data.market === 'us');
+    el.outerHTML = renderNewsHTML(json.articles || [], json);
   } catch(e) {
     if (el) el.innerHTML = `<div class="news-empty">新聞暫時無法載入：${e.message}</div>`;
   }
@@ -1149,19 +1220,25 @@ function renderBuyZoneHTML(bz, cur) {
 }
 
 // ── News Render ───────────────────────────────────────────────────
-function renderNewsHTML(articles) {
-  if (!articles.length) return `<div class="news-card"><div class="res-card-title">最新新聞輿情</div><div class="news-empty">近14日暫無高相關新聞</div></div>`;
-  const items = articles.map(a => {
+function renderNewsHTML(articles, meta) {
+  if (!articles || !articles.length) return `<div class="news-card"><div class="res-card-title">最新新聞輿情</div><div class="news-empty">近14日暫無高相關新聞</div></div>`;
+  const insufficient = meta && meta.insufficient;
+  const items = articles.map((a, idx) => {
     let pubStr = '日期未知';
+    let daysOld = null;
     if (a.published) {
       try {
         const d = new Date(a.published); if (!isNaN(d)) {
-          const diff = Math.floor((new Date() - d) / 86400000);
-          pubStr = diff === 0 ? '今天' : diff === 1 ? '昨天' : diff < 7 ? diff + '天前' : d.toLocaleDateString('zh-TW', { month: '2-digit', day: '2-digit' });
+          daysOld = Math.floor((new Date() - d) / 86400000);
+          pubStr = daysOld === 0 ? '今天' : daysOld === 1 ? '昨天' : daysOld < 7 ? daysOld + '天前' : d.toLocaleDateString('zh-TW', { month: '2-digit', day: '2-digit' });
         }
       } catch (_) {}
     }
-    return `<div class="news-item">
+    // 插入「不足」分隔線
+    const divider = (insufficient && meta.recent_count !== undefined && idx === meta.recent_count && idx > 0)
+      ? `<div style="margin:8px 0;padding:6px 10px;background:rgba(245,158,11,.06);border-radius:6px;font-size:11px;color:var(--yellow);">近14日內新聞不足，以下補充較早資料，僅供參考。</div>`
+      : '';
+    return divider + `<div class="news-item">
       <a href="${a.url}" target="_blank" rel="noopener">${a.title}</a>
       <div class="news-meta"><span class="news-source">${a.source}</span><span class="news-date">${pubStr}</span></div>
       ${a.snippet ? `<div class="news-snippet">${a.snippet}</div>` : ''}
@@ -1177,20 +1254,34 @@ function setThemeMarket(m) {
   document.getElementById('theme-us-btn').className = 'mkt-btn' + (m === 'us' ? ' active' : '');
 }
 
+let _lastScanTime = null;
+let _lastScanPreview = null;
+
+function updateScanStatus(msg, color) {
+  const el = document.getElementById('scan-status-text');
+  if (el) { el.textContent = msg; el.style.color = color || 'var(--text3)'; }
+}
+
 async function scanThemes() {
   const btn = document.getElementById('scanBtn'), result = document.getElementById('themes-result');
   btn.disabled = true; btn.textContent = '掃描中…';
-  result.innerHTML = '<div class="themes-loading">正在搜尋新聞，AI 分析題材中（約10-15秒）…</div>';
+  updateScanStatus(`正在掃描${themeMarket === 'tw' ? '台股' : '美股'}…`, 'var(--blue)');
+  result.innerHTML = '<div class="themes-loading">正在掃描市場題材，可能需要 10～30 秒…</div>';
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 28000);
+  const timer = setTimeout(() => controller.abort(), 35000);
   try {
     const res = await fetch(`/api/hot-themes?market=${themeMarket}`, { signal: controller.signal });
     clearTimeout(timer);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || '掃描失敗');
+    _lastScanTime = new Date();
+    _lastScanPreview = (data.themes || []).slice(0, 3).map(t => t.name);
+    const timeStr = _lastScanTime.toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' });
+    updateScanStatus(`上次掃描 ${timeStr}　前三名：${_lastScanPreview.join('、')}`, 'var(--text2)');
     result.innerHTML = renderThemes(data);
   } catch (e) {
-    result.innerHTML = `<div class="error-box">⚠️ ${e.message}</div>`;
+    result.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text2);font-size:13px;">⚠️ 題材掃描失敗，請稍後再試。<br><small style="color:var(--text3)">${e.message}</small></div>`;
+    updateScanStatus('掃描失敗', 'var(--red)');
   } finally {
     btn.disabled = false; btn.textContent = '⚡ 掃描題材';
   }
