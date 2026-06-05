@@ -814,6 +814,7 @@ async function analyze() {
     renderResult(data);
     fetchAIZone(data);
     fetchNews(data);
+    if (data.market === 'tw') fetchInstitutionalData(data.stock_id);
   } catch(e) {
     result.innerHTML = `<div class="error-box">⚠️ ${e.message}</div>`;
   } finally {
@@ -833,6 +834,25 @@ async function fetchAIZone(data) {
   } catch(e) {
     if (el) el.innerHTML = `<div style="padding:12px;color:var(--text2);font-size:12px">AI 分析暫時不可用：${e.message}</div>`;
   }
+}
+
+async function fetchInstitutionalData(stockId) {
+  const el = document.getElementById('chip-placeholder');
+  if (!el) return;
+  try {
+    const res = await fetch(`/api/institutional?stock_id=${encodeURIComponent(stockId)}`);
+    const ch = await res.json();
+    if (!res.ok || !ch.available) { el.remove(); return; }
+    const fC = ch.foreign_5d >= 0 ? 'chip-pos' : 'chip-neg';
+    const tC = ch.trust_5d   >= 0 ? 'chip-pos' : 'chip-neg';
+    const dC = ch.dealer_5d  >= 0 ? 'chip-pos' : 'chip-neg';
+    const totC = ch.total_5d >= 0 ? 'chip-pos' : 'chip-neg';
+    el.innerHTML = `
+      <div class="chip-item"><label>外資近${ch.days}日</label><span class="${fC}">${ch.foreign_5d >= 0?'+':''}${ch.foreign_5d}千張</span></div>
+      <div class="chip-item"><label>投信近${ch.days}日</label><span class="${tC}">${ch.trust_5d >= 0?'+':''}${ch.trust_5d}千張</span></div>
+      <div class="chip-item"><label>自營近${ch.days}日</label><span class="${dC}">${ch.dealer_5d >= 0?'+':''}${ch.dealer_5d}千張</span></div>
+      <div class="chip-item"><label>三大合計</label><span class="${totC}" style="font-size:16px">${ch.total_5d >= 0?'+':''}${ch.total_5d}千張</span></div>`;
+  } catch(_) { if(el) el.remove(); }
 }
 
 async function fetchNews(data) {
@@ -862,22 +882,8 @@ function renderResult(d) {
   const macdColor = ind.macd_hist > 0 ? 'var(--green)' : 'var(--red)';
   const monthKColor = ind.month_k < 30 ? 'var(--green)' : ind.month_k > 70 ? 'var(--yellow)' : 'var(--text)';
 
-  // Phase 2: Institutional data
-  let chipHtml = '';
-  if (d.institutional && !us) {
-    const ch = d.institutional;
-    const fC = ch.foreign_5d >= 0 ? 'chip-pos' : 'chip-neg';
-    const tC = ch.trust_5d >= 0 ? 'chip-pos' : 'chip-neg';
-    const dC = ch.dealer_5d >= 0 ? 'chip-pos' : 'chip-neg';
-    const totC = ch.total_5d >= 0 ? 'chip-pos' : 'chip-neg';
-    chipHtml = `
-      <div class="chip-row">
-        <div class="chip-item"><label>外資近${ch.days}日</label><span class="${fC}">${ch.foreign_5d >= 0 ? '+' : ''}${ch.foreign_5d}千張</span></div>
-        <div class="chip-item"><label>投信近${ch.days}日</label><span class="${tC}">${ch.trust_5d >= 0 ? '+' : ''}${ch.trust_5d}千張</span></div>
-        <div class="chip-item"><label>自營近${ch.days}日</label><span class="${dC}">${ch.dealer_5d >= 0 ? '+' : ''}${ch.dealer_5d}千張</span></div>
-        <div class="chip-item"><label>三大合計</label><span class="${totC}" style="font-size:16px">${ch.total_5d >= 0 ? '+' : ''}${ch.total_5d}千張</span></div>
-      </div>`;
-  }
+  // Phase 2: Institutional — async placeholder (filled by fetchInstitutionalData)
+  const chipHtml = us ? '' : '<div class="chip-row" id="chip-placeholder" style="color:var(--text3);font-size:12px">籌碼面載入中…</div>';
 
   let valHtml = '';
   if (d.valuation && (d.valuation.per || d.valuation.yield)) {
