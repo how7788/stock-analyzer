@@ -18,7 +18,7 @@ async function finmindFetch(dataset, stockId, startDate) {
   return json.data || [];
 }
 
-// ── Phase 2: 籌碼面 ────────────────────────────────────────────────
+// Phase 2: 籌碼面（序列呼叫，避免 FinMind rate limit）
 async function fetchInstitutional(stockId) {
   try {
     const data = await finmindFetch("TaiwanStockInstitutionalInvestors", stockId, daysAgo(10));
@@ -26,23 +26,21 @@ async function fetchInstitutional(stockId) {
     const last5 = data.slice(-5);
     let foreign = 0, trust = 0, dealer = 0;
     for (const d of last5) {
-      foreign += Number(d.Foreign_Investor_Buy_Sell ?? ((Number(d.Foreign_Investor_Buy) || 0) - (Number(d.Foreign_Investor_Sell) || 0)));
-      trust   += Number(d.Investment_Trust_Buy_Sell ?? ((Number(d.Investment_Trust_Buy) || 0) - (Number(d.Investment_Trust_Sell) || 0)));
-      dealer  += Number(d.Dealer_Buy_Sell ?? ((Number(d.Dealer_Buy) || 0) - (Number(d.Dealer_Sell) || 0)));
+      foreign += Number(d.Foreign_Investor_Buy_Sell ?? ((Number(d.Foreign_Investor_Buy)||0) - (Number(d.Foreign_Investor_Sell)||0)));
+      trust   += Number(d.Investment_Trust_Buy_Sell ?? ((Number(d.Investment_Trust_Buy)||0) - (Number(d.Investment_Trust_Sell)||0)));
+      dealer  += Number(d.Dealer_Buy_Sell ?? ((Number(d.Dealer_Buy)||0) - (Number(d.Dealer_Sell)||0)));
     }
-    const total = foreign + trust + dealer;
     return {
       date: last5[last5.length - 1].date,
       days: last5.length,
       foreign_5d: Math.round(foreign / 1000),
       trust_5d:   Math.round(trust   / 1000),
       dealer_5d:  Math.round(dealer  / 1000),
-      total_5d:   Math.round(total   / 1000),
+      total_5d:   Math.round((foreign + trust + dealer) / 1000),
     };
   } catch (_) { return null; }
 }
 
-// ── 技術指標計算 ─────────────────────────────────────────────────
 function sma(arr, period) {
   return arr.map((_, i) => {
     if (i < period - 1) return null;
@@ -97,7 +95,7 @@ function calcKD(highs, lows, closes, period = 9) {
   return { k, d };
 }
 
-// ── Phase 3: 布林通道 ────────────────────────────────────────────
+// Phase 3: 布林通道
 function calcBollinger(closes, period = 20) {
   return closes.map((_, i) => {
     if (i < period - 1) return { upper: null, lower: null };
@@ -165,25 +163,20 @@ module.exports = async function handler(req, res) {
   if (!/^\d{4,6}$/.test(cleanId)) return res.status(400).json({ error: `「${cleanId}」不是有效的台股代號` });
 
   try {
-    // Phase 2: 並行抓取技術面 + 籌碼面
-    const [raw, institutionalData] = await Promise.all([
-      finmindFetch("TaiwanStockPrice", cleanId, daysAgo(420)),
-      fetchInstitutional(cleanId),
-    ]);
+    // ★ 序列呼叫，避免 FinMind rate limit
+    const raw = await finmindFetch("TaiwanStockPrice", cleanId, daysAgo(420));
     if (!raw || raw.length === 0) return res.status(404).json({ error: `查無股票代號 ${cleanId}` });
 
     raw.sort((a, b) => a.date.localeCompare(b.date));
     const latest = raw[raw.length - 1];
     const closes = raw.map(d => parseFloat(d.close));
-    const highs = raw.map(d => parseFloat(d.max));
-    const lows = raw.map(d => parseFloat(d.min));
     const n = closes.length;
 
     const ma5arr = sma(closes, 5), ma20arr = sma(closes, 20);
     const ma60arr = sma(closes, 60), ma120arr = sma(closes, 120), ma240arr = sma(closes, 240);
     const { ml, sl, hist } = calcMACD(closes);
     const rsi = calcRSI(closes.slice(-50));
-    const bollingerArr = calcBollinger(closes); // Phase 3
+    const bollingerArr = calcBollinger(closes);
 
     const monthly = toMonthly(raw);
     const { k: mk, d: md } = calcKD(monthly.map(d => d.high), monthly.map(d => d.low), monthly.map(d => d.close), 9);
@@ -192,12 +185,17 @@ module.exports = async function handler(req, res) {
     const prev = closes[n - 2];
     const changePct = prev ? Math.round((closes[n - 1] - prev) / prev * 10000) / 100 : null;
     const last252 = closes.slice(-252);
+    const p = closes[n - 1];
 
-    const maPos = [], p = closes[n - 1];
-    if (ma60arr[n - 1] != null)  maPos.push(p > ma60arr[n - 1]  ? `站上季線（${ma60arr[n - 1]}）`  : `跌破季線（${ma60arr[n - 1]}）`);
-    if (ma120arr[n - 1] != null) maPos.push(p > ma120arr[n - 1] ? `站上半年線（${ma120arr[n - 1]}）` : `跌破半年線（${ma120arr[n - 1]}）`);
-    if (ma240arr[n - 1] != null) maPos.push(p > ma240arr[n - 1] ? `站上年線（${ma240arr[n - 1]}）`  : `跌破年線（${ma240arr[n - 1]}）`);
+    const maPos = [];
+    if (ma60arr[n-1] != null)  maPos.push(p > ma60arr[n-1]  ? `站上季線（${ma60arr[n-1]}）`  : `跌破季線（${ma60arr[n-1]}）`);
+    if (ma120arr[n-1] != null) maPos.push(p > ma120arr[n-1] ? `站上半年線（${ma120arr[n-1]}）` : `跌破半年線（${ma120arr[n-1]}）`);
+    if (ma240arr[n-1] != null) maPos.push(p > ma240arr[n-1] ? `站上年線（${ma240arr[n-1]}）`  : `跌破年線（${ma240arr[n-1]}）`);
 
+    // Phase 2: 籌碼面（序列，失敗不影響主流程）
+    const institutionalData = await fetchInstitutional(cleanId);
+
+    // 估值
     let valuation = null;
     try {
       const perRaw = await finmindFetch("TaiwanStockPER", cleanId, daysAgo(10));
@@ -207,6 +205,7 @@ module.exports = async function handler(req, res) {
       }
     } catch (_) {}
 
+    // 月營收
     let monthly_revenue = null;
     try {
       const revRaw = await finmindFetch("TaiwanStockMonthRevenue", cleanId, daysAgo(90));
@@ -218,49 +217,43 @@ module.exports = async function handler(req, res) {
     } catch (_) {}
 
     const indicators = {
-      ma5: ma5arr[n - 1], ma20: ma20arr[n - 1], ma60: ma60arr[n - 1], ma120: ma120arr[n - 1], ma240: ma240arr[n - 1],
-      rsi, macd_line: ml[n - 1], macd_signal: sl[n - 1], macd_hist: hist[n - 1],
+      ma5: ma5arr[n-1], ma20: ma20arr[n-1], ma60: ma60arr[n-1], ma120: ma120arr[n-1], ma240: ma240arr[n-1],
+      rsi, macd_line: ml[n-1], macd_signal: sl[n-1], macd_hist: hist[n-1],
       month_k: monthK, month_d: monthD,
       high_52w: last252.length ? Math.max(...last252) : null,
-      low_52w: last252.length ? Math.min(...last252) : null,
+      low_52w:  last252.length ? Math.min(...last252) : null,
       ma_position: maPos,
-      boll_upper: bollingerArr[n - 1]?.upper,  // Phase 3
-      boll_lower: bollingerArr[n - 1]?.lower,  // Phase 3
+      boll_upper: bollingerArr[n-1]?.upper,
+      boll_lower: bollingerArr[n-1]?.lower,
     };
 
-    const signal = generateSignal(p, ma20arr[n - 1], ma60arr[n - 1], ma120arr[n - 1], ma240arr[n - 1], rsi, hist[n - 1], monthK);
+    const signal = generateSignal(p, ma20arr[n-1], ma60arr[n-1], ma120arr[n-1], ma240arr[n-1], rsi, hist[n-1], monthK);
 
-    // Phase 3: history 包含 volume + Bollinger
     const history = raw.slice(-240).map((d, i) => {
       const idx = n - 240 + i;
       return {
         date: d.date,
         close: parseFloat(d.close),
         volume: parseInt(d.Trading_Volume || 0),
-        ma20: idx >= 0 ? ma20arr[idx] : null,
-        ma60: idx >= 0 ? ma60arr[idx] : null,
+        ma20:  idx >= 0 ? ma20arr[idx]  : null,
+        ma60:  idx >= 0 ? ma60arr[idx]  : null,
         ma240: idx >= 0 ? ma240arr[idx] : null,
-        boll_upper: idx >= 0 ? bollingerArr[idx]?.upper : null,  // Phase 3
-        boll_lower: idx >= 0 ? bollingerArr[idx]?.lower : null,  // Phase 3
-        macd: idx >= 0 ? ml[idx] : null,
-        macd_signal: idx >= 0 ? sl[idx] : null,
-        macd_hist: idx >= 0 ? hist[idx] : null,
+        boll_upper: idx >= 0 ? (bollingerArr[idx]?.upper ?? null) : null,
+        boll_lower: idx >= 0 ? (bollingerArr[idx]?.lower ?? null) : null,
+        macd:        idx >= 0 ? ml[idx]   : null,
+        macd_signal: idx >= 0 ? sl[idx]   : null,
+        macd_hist:   idx >= 0 ? hist[idx] : null,
       };
     });
 
     return res.status(200).json({
       stock_id: cleanId,
       name: latest.stock_name || cleanId,
-      market: 'tw',
-      updated: latest.date,
+      market: 'tw', updated: latest.date,
       data_note: '資料來源：FinMind，可能非即時報價',
-      price: {
-        close: p, open: parseFloat(latest.open),
-        high: parseFloat(latest.max), low: parseFloat(latest.min),
-        volume: parseInt(latest.Trading_Volume || 0), change_percent: changePct,
-      },
+      price: { close: p, open: parseFloat(latest.open), high: parseFloat(latest.max), low: parseFloat(latest.min), volume: parseInt(latest.Trading_Volume || 0), change_percent: changePct },
       indicators, signal, valuation, monthly_revenue,
-      institutional: institutionalData, // Phase 2
+      institutional: institutionalData,
       history,
     });
   } catch (err) {
