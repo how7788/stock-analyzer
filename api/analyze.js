@@ -169,10 +169,24 @@ module.exports = async function handler(req, res) {
       const perRaw = await finmindFetch("TaiwanStockPER", cleanId, daysAgo(10));
       if (perRaw?.length > 0) {
         const last = perRaw[perRaw.length - 1];
-        stockNameFromPer = last.stock_name || null;
+        // TaiwanStockPER 可能用 stock_name 或 name
+        stockNameFromPer = last.stock_name || last.name || null;
         valuation = { date: last.date, per: last.PER != null ? Math.round(last.PER * 10) / 10 : null, pbr: last.PBR != null ? Math.round(last.PBR * 100) / 100 : null, yield: last.dividend_yield != null ? Math.round(last.dividend_yield * 100) / 100 : null };
       }
     } catch (_) {}
+
+    // 若仍無股名，從 TaiwanStockInfo 補抓
+    if (!stockNameFromPer) {
+      try {
+        const token = process.env.FINMIND_TOKEN;
+        const infoRes = await fetch(`${FINMIND_BASE}?dataset=TaiwanStockInfo&data_id=${encodeURIComponent(cleanId)}&token=${token}`);
+        if (infoRes.ok) {
+          const infoJson = await infoRes.json();
+          const infoData = infoJson.data || [];
+          if (infoData.length > 0) stockNameFromPer = infoData[0].stock_name || infoData[0].name || null;
+        }
+      } catch (_) {}
+    }
 
     let monthly_revenue = null;
     try {
