@@ -11,7 +11,7 @@ module.exports = async function handler(req, res) {
   let body = req.body;
   if (typeof body === "string") { try { body = JSON.parse(body); } catch (_) {} }
 
-  const { stock_id, name, market, currency, price, indicators, signal, valuation, monthly_revenue, institutional } = body || {};
+  const { stock_id, name, market, currency, price, indicators, signal, valuation, monthly_revenue, institutional, analyst } = body || {};
   if (!stock_id) return res.status(400).json({ error: "缺少 stock_id" });
 
   const isUS = market === "us";
@@ -36,10 +36,17 @@ module.exports = async function handler(req, res) {
     ? `P/E=${valuation.per ?? "N/A"}  P/B=${valuation.pbr ?? "N/A"}  殖利率=${valuation.yield ?? "N/A"}%`
     : "估值資料無";
 
+  // Phase 2: 籌碼面段落
+  // 分析師共識
+  const analystStr = analyst?.numAnalysts
+    ? `${analyst.numAnalysts}位分析師　評等：${analyst.recLabel || analyst.recKey || '—'}　目標價均值：${analyst.targetMean ?? '—'}　區間：${analyst.targetLow ?? '—'}～${analyst.targetHigh ?? '—'}　上漲空間：${analyst.upside != null ? (analyst.upside > 0 ? '+' : '') + analyst.upside + '%' : '—'}`
+    : null;
+
   const chipStr = institutional && !isUS
     ? `外資近${institutional.days}日：${institutional.foreign_5d > 0 ? '+' : ''}${institutional.foreign_5d}千張  投信：${institutional.trust_5d > 0 ? '+' : ''}${institutional.trust_5d}千張  自營：${institutional.dealer_5d > 0 ? '+' : ''}${institutional.dealer_5d}千張  三大法人合計：${institutional.total_5d > 0 ? '+' : ''}${institutional.total_5d}千張`
     : null;
 
+  // Phase 2: 布林通道段落
   const bollStr = indicators?.boll_upper && indicators?.boll_lower
     ? `布林上軌=${indicators.boll_upper}  布林下軌=${indicators.boll_lower}  現價相對布林：${price?.close > indicators.boll_upper ? '突破上軌' : price?.close < indicators.boll_lower ? '跌破下軌' : '帶內'}`
     : null;
@@ -56,6 +63,7 @@ ${bollStr ? `布林通道：${bollStr}` : ""}
 ${valStr}
 ${monthly_revenue ? `月營收年增率：${monthly_revenue.yoy}%  月增率：${monthly_revenue.mom}%` : ""}
 ${chipStr ? `籌碼面（三大法人）：${chipStr}` : ""}
+${analystStr ? `分析師共識：${analystStr}` : ""}
 多方${signal?.bullScore}  空方${signal?.bearScore}  ${signal?.summary}
 
 只輸出以下 JSON，不要其他文字，所有字串值不含雙引號或換行符號：
@@ -93,7 +101,7 @@ ${chipStr ? `籌碼面（三大法人）：${chipStr}` : ""}
   "risk": "medium"
 }
 
-verdict 只能是 buy/watch/avoid。entry_quality 只能是 excellent/good/fair/poor。risk 只能是 low/medium/high。score 0-100。stop_loss/target 給實際價格數字。${chipStr ? 'checklist 中法人籌碼 item 要根據實際籌碼資料判斷。' : 'checklist 中法人籌碼 status 設 null，note 設 美股無此資料。'}`;
+verdict 只能是 buy/watch/avoid。entry_quality 只能是 excellent/good/fair/poor。risk 只能是 low/medium/high。score 0-100。stop_loss/target 給實際價格數字。${chipStr ? 'checklist 中法人籌碼 item 要根據實際籌碼資料判斷。' : 'checklist 中法人籌碼 status 設 null，note 設 美股無此資料。'}${analystStr ? ' 請參考分析師共識評等與目標價輔助判斷 score 與 verdict，並在 reason 中提及。' : ''}`;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 25000);
@@ -112,16 +120,11 @@ verdict 只能是 buy/watch/avoid。entry_quality 只能是 excellent/good/fair/
     const s = text.indexOf("{"), e = text.lastIndexOf("}");
     if (s === -1) throw new Error("AI 未回傳 JSON");
 
-    let jsonStr = text.slice(s, e + 1)
-      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
-      .replace(/\r\n|\r|\n/g, " ")
-      .replace(/\t/g, " ")
-      .replace(/,(\s*[}\]])/g, "$1");
-
+    let jsonStr = text.slice(s, e + 1).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "").replace(/,(\s*[}\]])/g, "$1");
     try { return res.status(200).json(JSON.parse(jsonStr)); }
-    catch (parseErr) {
-      console.error("[ai-zone] JSON parse failed:", parseErr.message);
-      return res.status(500).json({ error: "AI 回傳格式錯誤，請重試" });
+    catch (_) {
+      jsonStr = jsonStr.replace(/\r\n/g, " ").replace(/[\r\n]/g, " ").replace(/,(\s*[}\]])/g, "$1");
+      return res.status(200).json(JSON.parse(jsonStr));
     }
   } catch (e) {
     clearTimeout(timeout);
