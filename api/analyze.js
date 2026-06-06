@@ -166,12 +166,21 @@ module.exports = async function handler(req, res) {
     let valuation = null;
     let stockNameFromPer = null;
     try {
-      const perRaw = await finmindFetch("TaiwanStockPER", cleanId, daysAgo(10));
+      const perRaw = await finmindFetch("TaiwanStockPER", cleanId, daysAgo(400));
       if (perRaw?.length > 0) {
         const last = perRaw[perRaw.length - 1];
-        // TaiwanStockPER 可能用 stock_name 或 name
         stockNameFromPer = last.stock_name || last.name || null;
-        valuation = { date: last.date, per: last.PER != null ? Math.round(last.PER * 10) / 10 : null, pbr: last.PBR != null ? Math.round(last.PBR * 100) / 100 : null, yield: last.dividend_yield != null ? Math.round(last.dividend_yield * 100) / 100 : null };
+        const pers = perRaw.map(d => d.PER).filter(v => v != null && v > 0);
+        const perAvg = pers.length ? Math.round(pers.reduce((a,v) => a+v, 0) / pers.length * 10) / 10 : null;
+        const perMin = pers.length ? Math.round(Math.min(...pers) * 10) / 10 : null;
+        const perMax = pers.length ? Math.round(Math.max(...pers) * 10) / 10 : null;
+        valuation = {
+          date: last.date,
+          per: last.PER != null ? Math.round(last.PER * 10) / 10 : null,
+          pbr: last.PBR != null ? Math.round(last.PBR * 100) / 100 : null,
+          yield: last.dividend_yield != null ? Math.round(last.dividend_yield * 100) / 100 : null,
+          per_avg_1y: perAvg, per_min_1y: perMin, per_max_1y: perMax,
+        };
       }
     } catch (_) {}
 
@@ -195,6 +204,20 @@ module.exports = async function handler(req, res) {
         revRaw.sort((a, b) => a.date.localeCompare(b.date));
         const last = revRaw[revRaw.length - 1], prev2 = revRaw.length >= 2 ? revRaw[revRaw.length - 2] : null;
         monthly_revenue = { date: last.date, revenue: last.revenue, yoy: last.revenue_year_over_year ?? null, mom: prev2?.revenue ? Math.round((last.revenue - prev2.revenue) / prev2.revenue * 10000) / 100 : null };
+      }
+    } catch (_) {}
+
+    // 股利資料
+    let dividends = [];
+    try {
+      const divRaw = await finmindFetch("TaiwanStockDividend", cleanId, daysAgo(1200));
+      if (divRaw?.length > 0) {
+        dividends = divRaw.slice(-6).reverse().map(d => ({
+          date: d.date,
+          cash: d.cash_dividend != null ? Math.round(d.cash_dividend * 100) / 100 : null,
+          stock: d.stock_dividend != null ? Math.round(d.stock_dividend * 100) / 100 : null,
+          type: d.type || null,
+        }));
       }
     } catch (_) {}
 
@@ -234,7 +257,7 @@ module.exports = async function handler(req, res) {
       market: 'tw', updated: latest.date,
       data_note: '資料來源：FinMind，可能非即時報價',
       price: { close: p, open: parseFloat(latest.open), high: parseFloat(latest.max), low: parseFloat(latest.min), volume: parseInt(latest.Trading_Volume || 0), change_percent: changePct },
-      indicators, signal, valuation, monthly_revenue, history,
+      indicators, signal, valuation, monthly_revenue, dividends, history,
     });
   } catch (err) {
     console.error("[analyze]", err.message);
