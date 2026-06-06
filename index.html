@@ -1196,17 +1196,35 @@ function drawPriceChart(h) {
   const ctx = document.getElementById('priceChart'); if (!ctx || !h.length) return;
   const labels = h.map(d => d.date.slice(5));
   destroyIfExists('priceChart');
+
+  // 自動計算 Y 軸範圍（基於可見資料，不讓 MA240 把圖壓扁）
+  const visibleVals = h.flatMap(d => [
+    d.close, d.ma20, d.ma60,
+    showBollinger ? d.boll_upper : null,
+    showBollinger ? d.boll_lower : null,
+  ].filter(v => v != null && v > 0));
+  const minV = Math.min(...visibleVals), maxV = Math.max(...visibleVals);
+  const pad = (maxV - minV) * 0.08;
+  const yMin = Math.floor((minV - pad) / 10) * 10;
+  const yMax = Math.ceil((maxV + pad) / 10) * 10;
+
   const datasets = [
-    { label: '收盤', data: h.map(d => d.close), borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,.06)', borderWidth: 2, fill: true, tension: .3, pointRadius: 0, spanGaps: true },
+    { label: '收盤', data: h.map(d => d.close), borderColor: '#3b82f6', borderWidth: 2, fill: false, tension: .3, pointRadius: 0, spanGaps: true },
     { label: 'MA20', data: h.map(d => d.ma20 ?? null), borderColor: '#f59e0b', borderWidth: 1.5, fill: false, tension: .3, pointRadius: 0, spanGaps: true },
     { label: 'MA60', data: h.map(d => d.ma60 ?? null), borderColor: '#f97316', borderWidth: 1.5, fill: false, tension: .3, pointRadius: 0, spanGaps: true },
-    { label: 'MA240', data: h.map(d => d.ma240 ?? null), borderColor: '#8b5cf6', borderWidth: 1.5, fill: false, tension: .3, pointRadius: 0, spanGaps: true },
+    { label: 'MA240', data: h.map(d => d.ma240 ?? null), borderColor: '#8b5cf6', borderWidth: 1, borderDash: [6, 4], fill: false, tension: .3, pointRadius: 0, spanGaps: true },
   ];
   if (showBollinger) {
-    datasets.push({ label: '布林上', data: h.map(d => d.boll_upper ?? null), borderColor: 'rgba(16,185,129,.6)', borderWidth: 1, borderDash: [4, 3], fill: false, pointRadius: 0, spanGaps: true });
-    datasets.push({ label: '布林下', data: h.map(d => d.boll_lower ?? null), borderColor: 'rgba(16,185,129,.6)', borderWidth: 1, borderDash: [4, 3], fill: false, pointRadius: 0, spanGaps: true });
+    datasets.push({ label: '布林上', data: h.map(d => d.boll_upper ?? null), borderColor: 'rgba(16,185,129,.7)', borderWidth: 1, borderDash: [4, 3], fill: false, pointRadius: 0, spanGaps: true });
+    datasets.push({ label: '布林下', data: h.map(d => d.boll_lower ?? null), borderColor: 'rgba(16,185,129,.7)', borderWidth: 1, borderDash: [4, 3], fill: '-1', backgroundColor: 'rgba(16,185,129,.04)', pointRadius: 0, spanGaps: true });
   }
-  priceChart = new Chart(ctx, { type: 'line', data: { labels, datasets }, options: chartDefaults() });
+
+  const opts = chartDefaults();
+  opts.scales.y.min = yMin;
+  opts.scales.y.max = yMax;
+  opts.scales.y.ticks.callback = v => v.toLocaleString('zh-TW', { maximumFractionDigits: 0 });
+
+  priceChart = new Chart(ctx, { type: 'line', data: { labels, datasets }, options: opts });
 }
 
 function drawVolChart(h) {
