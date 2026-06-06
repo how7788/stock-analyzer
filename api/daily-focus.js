@@ -28,6 +28,8 @@ async function fetchNews(tavilyKey, daysParam) {
     "台股 資金輪動 題材 法人買賣 重點",
     "美國科技股 AI 半導體 聯準會 最新消息 中文",
     "NVIDIA 台積電ADR 輝達 蘋果供應鏈 中文財經",
+    "聯準會 利率 美債殖利率 通膨 美元指數 中文",
+    "美國 CPI 就業 GDP 台股影響 總經 中文",
   ];
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 9000);
