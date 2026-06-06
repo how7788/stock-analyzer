@@ -42,6 +42,7 @@ section{margin-bottom:32px;}
 .mkt-tab{background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;color:var(--text2);transition:all .2s;}
 .mkt-tab.tw.active{background:rgba(239,68,68,.08);border-color:var(--red);color:var(--red);}
 .mkt-tab.us.active{background:rgba(59,130,246,.08);border-color:var(--blue);color:var(--blue);}
+.mkt-tab.jp.active{background:rgba(239,68,68,.06);border-color:#dc2626;color:#dc2626;}
 
 /* ── Section Header ── */
 .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;}
@@ -179,6 +180,8 @@ section{margin-bottom:32px;}
 .quick-btns{display:flex;gap:6px;flex-wrap:wrap;}
 .quick-btn{background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text2);transition:all .15s;min-height:30px;}
 .quick-btn.tw:hover{border-color:var(--red);color:var(--red);}
+.quick-btn.jp{border-color:rgba(220,38,38,.3);}
+.quick-btn.jp:hover{border-color:#dc2626;color:#dc2626;}
 .quick-btn.us:hover{border-color:var(--blue);color:var(--blue);}
 .analyze-controls{display:flex;align-items:flex-start;gap:12px;margin-top:12px;flex-wrap:wrap;}
 
@@ -210,6 +213,7 @@ section{margin-bottom:32px;}
 .mkt-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.3px;}
 .mkt-badge.tw{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2);}
 .mkt-badge.us{background:rgba(59,130,246,.1);color:var(--blue);border:1px solid rgba(59,130,246,.2);}
+.mkt-badge.jp{background:rgba(220,38,38,.08);color:#dc2626;border:1px solid rgba(220,38,38,.2);}
 .price-main{font-family:'JetBrains Mono',monospace;font-size:clamp(28px,5vw,42px);font-weight:600;line-height:1;margin:6px 0;}
 .price-change{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:500;}
 .tw-up{color:var(--red);}.tw-down{color:var(--green);}
@@ -439,6 +443,7 @@ section{margin-bottom:32px;}
       <span style="font-size:10px;color:var(--text3);margin-right:4px;">搜尋市場</span>
       <button class="mkt-tab tw" id="tab-tw" onclick="setInputMkt('tw')">🇹🇼 台股</button>
       <button class="mkt-tab us" id="tab-us" onclick="setInputMkt('us')">🇺🇸 美股</button>
+      <button class="mkt-tab jp" id="tab-jp" onclick="setInputMkt('jp')">🇯🇵 日股</button>
     </div>
   </div>
 </header>
@@ -469,7 +474,7 @@ section{margin-bottom:32px;}
     <div class="section-title-row">
       <div class="section-icon">📋</div>
       <div>
-        <div class="section-label">產業焦點導航 <span class="section-badge">AI 精選</span></div>
+        <div class="section-label">產業焦點導航</div>
         <div class="section-sub" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">⏱ 每日核心題材　12:00 更新（台灣時間）</div>
       </div>
     </div>
@@ -561,6 +566,15 @@ section{margin-bottom:32px;}
       <button class="quick-btn us" onclick="quickSearch('MSFT')">MSFT 微軟</button>
       <button class="quick-btn us" onclick="quickSearch('SPY')">SPY 標普500</button>
       <button class="quick-btn us" onclick="quickSearch('QQQ')">QQQ 那斯達克</button>
+    </div>
+    <div class="quick-group-label" style="margin-top:10px;">🇯🇵 日股快捷</div>
+    <div class="quick-btns">
+      <button class="quick-btn jp" onclick="quickSearchJP('6779')">6779 日本電波</button>
+      <button class="quick-btn jp" onclick="quickSearchJP('6981')">6981 村田製作</button>
+      <button class="quick-btn jp" onclick="quickSearchJP('6976')">6976 太陽誘電</button>
+      <button class="quick-btn jp" onclick="quickSearchJP('6723')">6723 瑞薩電子</button>
+      <button class="quick-btn jp" onclick="quickSearchJP('3891')">3891 日本高度紙</button>
+      <button class="quick-btn jp" onclick="quickSearchJP('7826')">7826 furuya金屬</button>
     </div>
 
     <!-- Phase 5: Compare toggle -->
@@ -861,13 +875,36 @@ function renderCompare(stocks, el) {
 // ── Search ────────────────────────────────────────────────────────
 function detectMarket() {
   const v = document.getElementById('stockInput').value.trim();
-  document.getElementById('tab-tw').className = 'mkt-tab tw' + (/^\d/.test(v) ? ' active' : '');
-  document.getElementById('tab-us').className = 'mkt-tab us' + (/^[A-Za-z]/.test(v) ? ' active' : '');
+  // .T suffix → JP, digits → TW, letters → US
+  const isJP = /\.T$/i.test(v);
+  const isTW = /^\d/.test(v) && !isJP;
+  const isUS = /^[A-Za-z]/.test(v) && !isJP;
+  document.getElementById('tab-tw').className = 'mkt-tab tw' + (isTW ? ' active' : '');
+  document.getElementById('tab-us').className = 'mkt-tab us' + (isUS ? ' active' : '');
+  document.getElementById('tab-jp').className = 'mkt-tab jp' + (isJP ? ' active' : '');
 }
 
 function setInputMkt(m) {
   document.getElementById('tab-tw').className = 'mkt-tab tw' + (m === 'tw' ? ' active' : '');
   document.getElementById('tab-us').className = 'mkt-tab us' + (m === 'us' ? ' active' : '');
+  document.getElementById('tab-jp').className = 'mkt-tab jp' + (m === 'jp' ? ' active' : '');
+  // JP 模式：input hint
+  const input = document.getElementById('stockInput');
+  if (m === 'jp') input.placeholder = '輸入日股代號，例如 6758（Sony）';
+  else input.placeholder = '台股 2330 或美股 AAPL';
+}
+
+function quickSearchJP(code) {
+  setInputMkt('jp');
+  document.getElementById('stockInput').value = code;
+  document.getElementById('tab-jp').className = 'mkt-tab jp active';
+  if (compareMode) {
+    const id = code + '.T';
+    if (compareQueue.length >= 5) { alert('最多 5 檔'); return; }
+    if (!compareQueue.includes(id)) { compareQueue.push(id); renderCompareQueue(); }
+  } else {
+    analyze();
+  }
 }
 
 function quickSearch(id) {
@@ -881,7 +918,8 @@ function quickSearch(id) {
   }
 }
 
-function isUS(v) { return /^[A-Za-z]/.test(v.trim()); }
+function isUS(v) { return /^[A-Za-z]/.test(v.trim()) && !/\.T$/i.test(v.trim()); }
+function isJP(v) { return /\.T$/i.test(v.trim()) || (document.getElementById('tab-jp')?.classList.contains('active') && /^\d/.test(v.trim())); }
 
 async function analyze() {
   const raw = document.getElementById('stockInput').value.trim();
@@ -901,8 +939,17 @@ async function analyze() {
   destroyCharts();
 
   try {
-    const us = isUS(raw);
-    const endpoint = us ? `/api/us-analyze?symbol=${encodeURIComponent(raw.toUpperCase())}` : `/api/analyze?stock_id=${encodeURIComponent(raw)}`;
+    const jp = isJP(raw);
+    const us = !jp && isUS(raw);
+    let endpoint;
+    if (jp) {
+      const jpCode = raw.trim().replace(/\.T$/i, '');
+      endpoint = `/api/jp-analyze?symbol=${encodeURIComponent(jpCode)}`;
+    } else if (us) {
+      endpoint = `/api/us-analyze?symbol=${encodeURIComponent(raw.toUpperCase())}`;
+    } else {
+      endpoint = `/api/analyze?stock_id=${encodeURIComponent(raw)}`;
+    }
     const res = await fetch(endpoint);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || '資料暫時無法取得');
@@ -1075,7 +1122,7 @@ function renderResult(d) {
       <div class="stock-header">
         <span class="stock-name">${d.name}</span>
         <span class="stock-code">${d.stock_id}</span>
-        <span class="mkt-badge ${us ? 'us' : 'tw'}">${us ? '🇺🇸 美股' : '🇹🇼 台股'}</span>
+        <span class="mkt-badge ${d.market === 'us' ? 'us' : d.market === 'jp' ? 'jp' : 'tw'}">${d.market === 'us' ? '🇺🇸 美股' : d.market === 'jp' ? '🇯🇵 日股' : '🇹🇼 台股'}</span>
       </div>
       <div class="price-main ${cc}">${fmt(p.close)} <span style="font-size:14px;font-weight:400;color:var(--text2)">${cur}</span></div>
       <div class="price-change ${cc}">${p.change_percent != null ? cs + fmt(p.change_percent) + '%' : ''}</div>
