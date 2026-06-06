@@ -737,27 +737,20 @@ function renderWatchlist() {
     const up = w.changePct > 0, down = w.changePct < 0;
     const cc = up ? 'up' : down ? 'down' : '';
     const cs = up ? '+' : '';
-    const verdictScore = w.score != null ? `${w.score}/100` : '—';
-    const verdictClass = { buy: 'score-buy', watch: 'score-watch', avoid: 'score-avoid' }[w.verdict] || 'score-watch';
-    const verdictLabel = { buy: '可布局', watch: '觀察', avoid: '避開' }[w.verdict] || '—';
-    return `<div class="wl-card" id="wl-${w.id}">
+    return `<div class="wl-card" id="wl-${w.id}" style="cursor:pointer;" onclick="quickSearch('${w.id}')">
       <div class="wl-card-top">
         <div style="min-width:0;flex:1;">
           <div style="display:flex;align-items:center;gap:6px;">
             <span class="wl-id" style="font-size:14px;font-weight:700;color:var(--text);font-family:'JetBrains Mono',monospace;">${w.id}</span>
           </div>
-          <div style="font-size:11px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;cursor:pointer;min-height:14px;" onclick="quickSearch('${w.id}')">${w.name !== w.id ? w.name : ''}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;min-height:14px;">${w.name !== w.id ? w.name : ''}</div>
         </div>
-        <button class="wl-remove" onclick="removeFromWatchlist('${w.id}')" title="移除">×</button>
+        <button class="wl-remove" onclick="event.stopPropagation();removeFromWatchlist('${w.id}')" title="移除">×</button>
       </div>
       ${w.price != null ? `
-        <div class="wl-price ${us ? (up?'up':down?'down':'') : (up?'tw-up':down?'tw-down':'')}">${fmt(w.price)}</div>
-        <div class="wl-change ${cc}">${cs}${w.changePct != null ? w.changePct+'%' : ''}</div>
-      ` : '<div class="wl-price" style="color:var(--text3)">—</div>'}
-      <div class="wl-score-row">
-        <span class="wl-score-badge ${verdictClass}">${verdictLabel} ${verdictScore}</span>
-        <span class="wl-signal">${w.signal || (w.price == null ? '未載入' : '')}</span>
-      </div>
+        <div class="wl-price ${us ? (up?'up':down?'down':'') : (up?'tw-up':down?'tw-down':'')}" style="min-height:28px;">${fmt(w.price)}</div>
+        <div class="wl-change ${cc}" style="min-height:18px;">${cs}${w.changePct != null ? w.changePct+'%' : ''}</div>
+      ` : '<div class="wl-price" style="color:var(--text3);min-height:28px;">—</div><div style="min-height:18px;"></div>'}
     </div>`;
   }).join('');
   area.innerHTML = `<div class="watchlist-grid">${cards}</div>`;
