@@ -13,8 +13,16 @@ module.exports = async function handler(req, res) {
   const isUS = market === "us";
 
   const queries = isUS
-    ? [`${stock_id} ${name} stock news analysis 2026`, `${name} earnings revenue outlook forecast`]
-    : [`${stock_id} ${name} 最新消息 財報 法說 2026`, `${name} 營收 展望 產業 分析`];
+    ? [
+        `${stock_id} ${name} stock news analysis 2026`,
+        `${name} earnings revenue outlook forecast`,
+        `${name} ${stock_id} 中文 最新 分析`,
+      ]
+    : [
+        `${stock_id} ${name} 最新消息 財報 法說 2026`,
+        `${name} 營收 展望 產業 分析`,
+        `${name} ${stock_id} 國際 外資 美股 中文`,
+      ];
 
   const DOMAIN_BLOCK = [
     'wantgoo.com','tw.stock.yahoo.com','finance.yahoo.com/quote',
@@ -80,7 +88,7 @@ module.exports = async function handler(req, res) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           api_key: tavilyKey, query: q, search_depth: "basic",
-          max_results: 7, days: 14, include_answer: false, include_raw_content: false,
+          max_results: 6, days: 14, include_answer: false, include_raw_content: false,
           include_domains: isUS ? ["reuters.com","bloomberg.com","cnbc.com","seekingalpha.com","barrons.com","wsj.com","fool.com","marketwatch.com"] : [],
         }),
       }).then(r => r.json()).catch(() => ({ results: [] }))
