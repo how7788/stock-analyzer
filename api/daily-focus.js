@@ -26,6 +26,8 @@ async function fetchNews(tavilyKey, daysParam) {
     "台股 AI伺服器 半導體 強勢族群 產業焦點",
     "台積電 聯發科 鴻海 廣達 最新消息",
     "台股 資金輪動 題材 法人買賣 重點",
+    "美國科技股 AI 半導體 聯準會 最新消息 中文",
+    "NVIDIA 台積電ADR 輝達 蘋果供應鏈 中文財經",
   ];
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 9000);
@@ -116,26 +118,17 @@ function getAvailableDates() {
   const fmt = d => {
     const m = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
-    return { label: `${m}/${dd}`, value: `${d.getFullYear()}-${m}-${dd}` };
+    return `${d.getFullYear()}-${m}-${dd}`;
   };
 
-  // 今日（跳過週末找最近交易日）
+  // 今日用實際日期，不跳過週末
   const today = new Date();
-  const getTradeDay = (offset) => {
-    const d = new Date(today);
-    d.setDate(d.getDate() + offset);
-    // 往前找最近的工作日
-    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() - 1);
-    return d;
-  };
-
-  const d0 = getTradeDay(0);
-  const d1 = new Date(d0); d1.setDate(d1.getDate() - 1);
-  while (d1.getDay() === 0 || d1.getDay() === 6) d1.setDate(d1.getDate() - 1);
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
 
   return [
-    { label: '今日', value: fmt(d0).value, days: 1 },
-    { label: '前日', value: fmt(d1).value, days: 2 },
+    { label: '今日', value: fmt(today), days: 2 },
+    { label: '前日', value: fmt(yesterday), days: 3 },
   ];
 }
 
