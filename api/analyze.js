@@ -132,7 +132,7 @@ module.exports = async function handler(req, res) {
   const { stock_id } = req.query;
   if (!stock_id) return res.status(400).json({ error: "請輸入股票代號，例如 2330" });
   const cleanId = stock_id.trim();
-  if (!/^\d{4,6}$/.test(cleanId)) return res.status(400).json({ error: `「${cleanId}」不是有效的台股代號` });
+  if (!/^\d{4,6}[A-Za-z]{0,2}$/.test(cleanId)) return res.status(400).json({ error: `「${cleanId}」不是有效的台股代號` });
 
   try {
     const raw = await finmindFetch("TaiwanStockPrice", cleanId, daysAgo(420));
