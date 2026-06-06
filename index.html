@@ -554,10 +554,10 @@ section{margin-bottom:32px;}
     <div class="quick-group-label">🇹🇼 台股快捷</div>
     <div class="quick-btns">
       <button class="quick-btn tw" onclick="quickSearch('2330')">2330 台積電</button>
-      <button class="quick-btn tw" onclick="quickSearch('2317')">2317 鴻海</button>
-      <button class="quick-btn tw" onclick="quickSearch('2454')">2454 聯發科</button>
-      <button class="quick-btn tw" onclick="quickSearch('2412')">2412 中華電</button>
-      <button class="quick-btn tw" onclick="quickSearch('0050')">0050 元大50</button>
+      <button class="quick-btn tw" onclick="quickSearch('2327')">2327 國巨</button>
+      <button class="quick-btn tw" onclick="quickSearch('00403A')">00403A</button>
+      <button class="quick-btn tw" onclick="quickSearch('00988A')">00988A</button>
+      <button class="quick-btn tw" onclick="quickSearch('3026')">3026 禾申堂</button>
     </div>
     <div class="quick-group-label" style="margin-top:10px;">🇺🇸 美股快捷</div>
     <div class="quick-btns">
@@ -955,7 +955,9 @@ async function analyze() {
     if (!res.ok) throw new Error(data.error || '資料暫時無法取得');
     currentHistoryFull = data.history || [];
     renderResult(data);
-    fetchAIZone(data);
+    fetchAnalystData(data).then(analyst => {
+      fetchAIZone(data, analyst);
+    });
     fetchNews(data);
     // 4. 搜尋後自動跳到結果
     setTimeout(() => {
@@ -970,6 +972,64 @@ async function analyze() {
 }
 
 let _lastAIData = null;
+let _lastAnalyst = null;
+
+async function fetchAnalystData(data) {
+  const el = document.getElementById('analyst-placeholder');
+  try {
+    const params = new URLSearchParams({ stock_id: data.stock_id, market: data.market || 'tw' });
+    const res = await fetch('/api/analyst?' + params);
+    const analyst = await res.json();
+    if (!res.ok || analyst.error) throw new Error(analyst.error || 'failed');
+    _lastAnalyst = analyst;
+    if (el) el.outerHTML = renderAnalystHTML(analyst);
+    return analyst;
+  } catch(_) {
+    if (el) el.remove();
+    return null;
+  }
+}
+
+function renderAnalystHTML(a) {
+  if (!a || !a.numAnalysts) return '';
+  const upC = a.upside > 0 ? 'var(--green)' : a.upside < 0 ? 'var(--red)' : 'var(--text)';
+  const recColor = { strongbuy:'var(--green)', buy:'var(--green)', hold:'var(--yellow)', sell:'var(--red)', strongsell:'var(--red)' }[(a.recKey||'').toLowerCase()] || 'var(--text)';
+  const t = a.trend;
+  const tTotal = t ? Object.values(t).reduce((s,v)=>s+(v||0),0) : 0;
+  const barHTML = (t && tTotal > 0) ? `
+    <div style="display:flex;height:6px;border-radius:4px;overflow:hidden;margin-top:8px;gap:1px;">
+      ${t.strongBuy ? `<div style="flex:${t.strongBuy};background:#10b981;" title="強力買入 ${t.strongBuy}"></div>` : ''}
+      ${t.buy ? `<div style="flex:${t.buy};background:#6ee7b7;" title="買入 ${t.buy}"></div>` : ''}
+      ${t.hold ? `<div style="flex:${t.hold};background:#f59e0b;" title="持有 ${t.hold}"></div>` : ''}
+      ${t.sell ? `<div style="flex:${t.sell};background:#fca5a5;" title="賣出 ${t.sell}"></div>` : ''}
+      ${t.strongSell ? `<div style="flex:${t.strongSell};background:#ef4444;" title="強力賣出 ${t.strongSell}"></div>` : ''}
+    </div>
+    <div style="display:flex;gap:10px;margin-top:4px;flex-wrap:wrap;">
+      ${t.strongBuy ? `<span style="font-size:10px;color:var(--green)">強買 ${t.strongBuy}</span>` : ''}
+      ${t.buy ? `<span style="font-size:10px;color:var(--green)">買入 ${t.buy}</span>` : ''}
+      ${t.hold ? `<span style="font-size:10px;color:var(--yellow)">持有 ${t.hold}</span>` : ''}
+      ${(t.sell||0)+(t.strongSell||0) > 0 ? `<span style="font-size:10px;color:var(--red)">賣出 ${(t.sell||0)+(t.strongSell||0)}</span>` : ''}
+    </div>` : '';
+  return `<div class="res-card">
+    <div class="res-card-title">分析師共識（${a.numAnalysts} 位）</div>
+    <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;">
+      <div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:3px;">綜合評等</div>
+        <div style="font-size:18px;font-weight:700;color:${recColor};">${a.recLabel || a.recKey || '—'}</div>
+      </div>
+      ${a.targetMean ? `<div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:3px;">目標價均值</div>
+        <div style="font-size:18px;font-weight:700;font-family:'JetBrains Mono',monospace;">${fmt(a.targetMean)}</div>
+        ${a.upside != null ? `<div style="font-size:11px;color:${upC};margin-top:2px;">${a.upside > 0 ? '▲' : '▼'} 上漲空間 ${a.upside > 0 ? '+' : ''}${a.upside}%</div>` : ''}
+      </div>` : ''}
+      ${a.targetHigh && a.targetLow ? `<div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:3px;">目標價區間</div>
+        <div style="font-size:13px;font-family:'JetBrains Mono',monospace;">${fmt(a.targetLow)} ～ ${fmt(a.targetHigh)}</div>
+      </div>` : ''}
+    </div>
+    ${barHTML}
+  </div>`;
+}
 
 function generateDataSummary(d) {
   const ind = d.indicators || {}, sig = d.signal || {}, val = d.valuation, rev = d.monthly_revenue;
@@ -1025,7 +1085,7 @@ function generateFallbackSummary(data) {
   return lines.filter(Boolean).join(' ') || '技術指標資料已載入，請參考均線與動能指標。';
 }
 
-async function fetchAIZone(data) {
+async function fetchAIZone(data, analyst) {
   _lastAIData = data;
   const el = document.getElementById('ai-zone-placeholder');
   if (!el) return;
@@ -1035,7 +1095,7 @@ async function fetchAIZone(data) {
   try {
     const res = await fetch('/api/ai-zone', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data), signal: controller.signal
+      body: JSON.stringify({ ...data, analyst }), signal: controller.signal
     });
     clearTimeout(timer);
     const bz = await res.json();
@@ -1065,12 +1125,13 @@ async function fetchAIZone(data) {
 
 function reanalyzeAI() {
   if (!_lastAIData) return;
+  const analyst = _lastAnalyst;
   const existing = document.getElementById('ai-zone-placeholder') || document.querySelector('.buy-zone-card');
   if (existing) {
     existing.id = 'ai-zone-placeholder';
     existing.className = 'buy-zone-card';
     existing.innerHTML = '<div class="bz-header"><span class="ai-badge">AI</span><span class="bz-title">中長期技術面評估</span></div><div class="ai-loading">AI 重新分析中…</div>';
-    fetchAIZone(_lastAIData);
+    fetchAIZone(_lastAIData, _lastAnalyst);
   }
 }
 
@@ -1169,6 +1230,9 @@ function renderResult(d) {
       <div class="signal-summary" style="color:${sigColor}">${sig.summary}</div>
       <div class="signal-items">${sig.signals.map(s => `<div class="signal-item sig-${s.type}"><span class="signal-dot"></span><span>${s.text}</span></div>`).join('')}</div>
     </div>
+
+    <!-- Analyst placeholder -->
+    <div id="analyst-placeholder"><div style="height:4px"></div></div>
 
     <!-- AI Zone placeholder -->
     <div class="buy-zone-card" id="ai-zone-placeholder">
