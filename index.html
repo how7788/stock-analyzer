@@ -1021,16 +1021,7 @@ function renderResult(d) {
       </div></div>`;
   }
 
-  let revHtml = '';
-  if (d.monthly_revenue) {
-    const r = d.monthly_revenue;
-    revHtml = `<div class="res-card"><div class="res-card-title">月營收（${(r.date || '').slice(0, 7)}）</div>
-      <div class="rev-grid">
-        <div class="rev-item"><label>當月營收</label><span>${fmtVol(r.revenue)}</span></div>
-        <div class="rev-item"><label>年增率 YoY</label><span class="${r.yoy > 0 ? 'tw-up' : r.yoy < 0 ? 'tw-down' : ''}">${r.yoy != null ? (r.yoy > 0 ? '+' : '') + fmt(r.yoy) + '%' : '<span class="val-na">暫無</span>'}</span></div>
-        <div class="rev-item"><label>月增率 MoM</label><span class="${r.mom > 0 ? 'tw-up' : r.mom < 0 ? 'tw-down' : ''}">${r.mom != null ? (r.mom > 0 ? '+' : '') + fmt(r.mom) + '%' : '<span class="val-na">暫無</span>'}</span></div>
-      </div></div>`;
-  }
+  const revHtml = '';  // 月營收已移至「股利與基本面支撐」區塊
 
   document.getElementById('result').innerHTML = `
     <!-- Stock Header -->
@@ -1088,8 +1079,8 @@ function renderResult(d) {
 
     <!-- AI Zone placeholder -->
     <div class="buy-zone-card" id="ai-zone-placeholder">
-      <div class="bz-header"><span class="ai-badge">AI</span><span class="bz-title">中長期技術面評估</span></div>
-      <div class="ai-loading">AI 正在進行技術面風險評估…</div>
+      <div class="bz-header"><span class="ai-badge">AI</span><span class="bz-title">結論與操作建議</span></div>
+      <div class="ai-loading">AI 正在分析中…</div>
     </div>
 
     <!-- News placeholder -->
@@ -1100,37 +1091,56 @@ function renderResult(d) {
 
     ${valHtml}
 
-    <!-- Phase 3: Price + Volume Chart -->
-    <div class="res-card">
-      <div class="chart-header">
-        <div class="res-card-title" style="margin:0">走勢圖（收盤 + MA + 布林通道）</div>
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <label class="boll-toggle"><input type="checkbox" id="boll-toggle" onchange="toggleBollinger(this.checked)"> 布林通道</label>
-          <div class="chart-range-btns">
-            <button class="range-btn" onclick="setChartRange(20)">1M</button>
-            <button class="range-btn active" onclick="setChartRange(60)">3M</button>
-            <button class="range-btn" onclick="setChartRange(120)">6M</button>
-            <button class="range-btn" onclick="setChartRange(240)">1Y</button>
-          </div>
-        </div>
-      </div>
-      <div class="chart-area"><canvas id="priceChart"></canvas></div>
-      <div id="chart-note" class="chart-info"></div>
-    </div>
 
-    <!-- Volume Chart -->
-    <div class="res-card">
-      <div class="res-card-title">成交量（近 ${chartRange} 日）</div>
-      <div class="chart-area small"><canvas id="volChart"></canvas></div>
-    </div>
-
-    <!-- MACD Chart -->
-    <div class="res-card">
-      <div class="res-card-title">MACD（近 ${chartRange} 日）</div>
-      <div class="chart-area small"><canvas id="macdChart"></canvas></div>
-    </div>
 
     ${revHtml}
+
+    <!-- 本益比與歷史對照 -->
+    ${d.valuation ? `<div class="res-card">
+      <div class="res-card-title">本益比與歷史對照（近一年）</div>
+      <div class="ind-grid">
+        <div class="ind-item"><label>本益比 P/E</label>
+          <span style="color:${d.valuation.per && d.valuation.per_avg_1y ? (d.valuation.per > d.valuation.per_avg_1y * 1.1 ? 'var(--red)' : d.valuation.per < d.valuation.per_avg_1y * 0.9 ? 'var(--green)' : 'var(--text)') : 'var(--text)'}">${d.valuation.per != null ? d.valuation.per + 'x' : '—'}</span>
+          ${d.valuation.per_avg_1y ? `<div class="sub">一年均值 ${d.valuation.per_avg_1y}x</div>` : ''}
+        </div>
+        <div class="ind-item"><label>一年區間</label>
+          <span style="font-size:13px">${d.valuation.per_min_1y != null ? d.valuation.per_min_1y + 'x' : '—'} ～ ${d.valuation.per_max_1y != null ? d.valuation.per_max_1y + 'x' : '—'}</span>
+          ${d.valuation.per && d.valuation.per_avg_1y ? `<div class="sub" style="color:${d.valuation.per > d.valuation.per_avg_1y * 1.1 ? 'var(--red)' : d.valuation.per < d.valuation.per_avg_1y * 0.9 ? 'var(--green)' : 'var(--text2)'}">
+            ${d.valuation.per > d.valuation.per_avg_1y * 1.15 ? '高於均值，估值偏貴' : d.valuation.per < d.valuation.per_avg_1y * 0.9 ? '低於均值，估值偏低' : '接近均值，估值合理'}
+          </div>` : ''}
+        </div>
+        <div class="ind-item"><label>P/B 淨值比</label><span>${d.valuation.pbr != null ? d.valuation.pbr + 'x' : '—'}</span></div>
+        <div class="ind-item"><label>現金殖利率</label><span style="color:var(--green)">${d.valuation.yield != null ? d.valuation.yield + '%' : '—'}</span></div>
+      </div>
+    </div>` : ''}
+
+    <!-- 股利與基本面支撐 -->
+    ${(d.dividends?.length || d.monthly_revenue) ? `<div class="res-card">
+      <div class="res-card-title">股利與基本面支撐</div>
+      ${d.dividends?.length ? `
+        <div style="margin-bottom:12px;">
+          <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">近期股利發放</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            ${d.dividends.slice(0,4).map(div => `
+              <div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;min-width:90px;">
+                <div style="font-size:10px;color:var(--text3);margin-bottom:3px;">${(div.date||'').slice(0,7)}</div>
+                ${div.cash != null && div.cash > 0 ? `<div style="font-size:13px;font-weight:600;color:var(--green);font-family:'JetBrains Mono',monospace;">現金 ${div.cash}</div>` : ''}
+                ${div.stock != null && div.stock > 0 ? `<div style="font-size:13px;font-weight:600;color:var(--blue);font-family:'JetBrains Mono',monospace;">股票 ${div.stock}</div>` : ''}
+                ${(!div.cash || div.cash === 0) && (!div.stock || div.stock === 0) ? `<div style="font-size:12px;color:var(--text3);">—</div>` : ''}
+              </div>`).join('')}
+          </div>
+        </div>` : ''}
+      ${d.monthly_revenue ? `
+        <div>
+          <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">月營收（${(d.monthly_revenue.date||'').slice(0,7)}）</div>
+          <div class="ind-grid">
+            <div class="ind-item"><label>當月營收</label><span style="font-size:13px">${fmtVol(d.monthly_revenue.revenue)}</span></div>
+            <div class="ind-item"><label>年增率 YoY</label><span style="color:${d.monthly_revenue.yoy > 0 ? 'var(--green)' : d.monthly_revenue.yoy < 0 ? 'var(--red)' : 'var(--text)'}">${d.monthly_revenue.yoy != null ? (d.monthly_revenue.yoy > 0 ? '+' : '') + fmt(d.monthly_revenue.yoy) + '%' : '—'}</span></div>
+            <div class="ind-item"><label>月增率 MoM</label><span style="color:${d.monthly_revenue.mom > 0 ? 'var(--green)' : d.monthly_revenue.mom < 0 ? 'var(--red)' : 'var(--text)'}">${d.monthly_revenue.mom != null ? (d.monthly_revenue.mom > 0 ? '+' : '') + fmt(d.monthly_revenue.mom) + '%' : '—'}</span></div>
+          </div>
+        </div>` : ''}
+    </div>` : ''}
+
     <div class="updated-tag">資料日期：${d.updated}｜${d.data_note || ''}</div>`;
 
   chartRange = 60;
@@ -1291,7 +1301,7 @@ function renderBuyZoneHTML(bz, cur) {
   const risksHtml = (bz.risk_factors || []).map(r => `<div class="factor-item">⚠️ ${r}</div>`).join('');
   const catsHtml = (bz.catalysts || []).map(c => `<div class="factor-item">✨ ${c}</div>`).join('');
   return `<div class="buy-zone-card">
-    <div class="bz-header"><span class="ai-badge">AI</span><span class="bz-title">中長期技術面評估</span><span class="entry-quality ${eqClass}">${bz.entry_label || ''}</span></div>
+    <div class="bz-header"><span class="ai-badge">AI</span><span class="bz-title">結論與操作建議</span><span class="entry-quality ${eqClass}">${bz.entry_label || ''}</span></div>
     ${bz.bias_warning ? `<div class="bz-bias-warn">🚨 ${bz.bias_warning}</div>` : ''}
     <div class="verdict-row">
       <div class="verdict-main"><span class="verdict-icon">${verdictIcon}</span><span class="verdict-label" style="color:${verdictColor}">${bz.verdict_label || ''}</span></div>
