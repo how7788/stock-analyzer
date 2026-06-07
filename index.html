@@ -1003,17 +1003,30 @@ function removeFromCompare(id) {
 async function runCompare() {
   if (compareQueue.length < 2) { alert('請至少加入 2 檔股票'); return; }
   const resultEl = document.getElementById('compare-result');
-  resultEl.innerHTML = '<div class="loading-box">正在比較中…<div class="loading-spinner"></div></div>';
+  resultEl.innerHTML = '<div class="loading-box">比較中（只抓技術指標，不呼叫AI，速度快）…<div class="loading-spinner"></div></div>';
+
   const results = await Promise.allSettled(compareQueue.map(async id => {
-    const us = /^[A-Za-z]/.test(id);
-    const endpoint = us ? `/api/us-analyze?symbol=${encodeURIComponent(id)}` : `/api/analyze?stock_id=${encodeURIComponent(id)}`;
+    const jp = isJP(id);
+    const us = !jp && isUS(id);
+    let endpoint;
+    if (jp) endpoint = `/api/jp-analyze?symbol=${encodeURIComponent(id.replace(/\.T$/i,''))}`;
+    else if (us) endpoint = `/api/us-analyze?symbol=${encodeURIComponent(id.toUpperCase())}`;
+    else endpoint = `/api/analyze?stock_id=${encodeURIComponent(id)}`;
     const data = await fetch(endpoint).then(r => r.json());
     if (data.error) throw new Error(data.error);
-    const bz = await fetch('/api/ai-zone', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(r => r.json());
-    return { ...data, ai: bz };
+    return data;
   }));
-  const stocks = results.filter(r => r.status === 'fulfilled').map(r => r.value).sort((a, b) => (b.ai?.score || 0) - (a.ai?.score || 0));
-  if (!stocks.length) { resultEl.innerHTML = '<div class="error-box">比較失敗，請重試</div>'; return; }
+
+  const stocks = results.filter(r => r.status === 'fulfilled').map(r => r.value);
+  const errors = results.filter(r => r.status === 'rejected').map(r => r.reason?.message);
+
+  if (!stocks.length) {
+    resultEl.innerHTML = `<div class="error-box">比較失敗：${errors.join('、')}</div>`;
+    return;
+  }
+
+  // 依均線多頭強度排序
+  stocks.sort((a, b) => (b.signal?.bullScore || 0) - (a.signal?.bullScore || 0));
   renderCompare(stocks, resultEl);
 }
 
@@ -1023,8 +1036,7 @@ function renderCompare(stocks, el) {
     const up = s.price?.change_percent > 0, down = s.price?.change_percent < 0;
     const cc = us(s) ? (up?'us-up':down?'us-down':'') : (up?'tw-up':down?'tw-down':'');
     const rankClass = i === 0 ? 'rank-1' : i === stocks.length - 1 ? 'rank-last' : '';
-    const rankLabel = i === 0 ? '🏆 綜合最強' : i === stocks.length - 1 ? '⚠️ 相對最弱' : `第 ${i + 1}`;
-    const scoreColor = (s.ai?.score || 0) >= 70 ? 'var(--green)' : (s.ai?.score || 0) >= 50 ? 'var(--yellow)' : 'var(--red)';
+    const rankLabel = i === 0 ? '🏆 多方最強' : i === stocks.length - 1 ? '⚠️ 相對最弱' : `第 ${i + 1}`;
     return `<div class="compare-card ${rankClass}">
       <span class="compare-rank">${rankLabel}</span>
       <div class="stock-header" style="margin-bottom:6px;">
@@ -1034,8 +1046,8 @@ function renderCompare(stocks, el) {
       <div class="compare-price ${cc}">${fmt(s.price?.close)} <span style="font-size:12px">${s.currency||''}</span></div>
       <div class="compare-rows">
         <div class="compare-row"><label>漲跌幅</label><span class="${cc}">${s.price?.change_percent != null ? (s.price.change_percent > 0 ? '+' : '') + s.price.change_percent + '%' : '—'}</span></div>
-        <div class="compare-row"><label>AI 評分</label><span style="color:${scoreColor}">${s.ai?.score ?? '—'} / 100</span></div>
-        <div class="compare-row"><label>建議</label><span>${s.ai?.verdict_label || '—'}</span></div>
+        <div class="compare-row"><label>多方強度</label><span style="color:var(--green)">${s.signal?.bullScore ?? '—'} / ${(s.signal?.bullScore||0)+(s.signal?.bearScore||0)}</span></div>
+        <div class="compare-row"><label>技術訊號</label><span style="font-size:11px">${s.signal?.overall === 'bullish' ? '✅ 偏多' : s.signal?.overall === 'bearish' ? '⚠️ 偏空' : '➡️ 中性'}</span></div>
         <div class="compare-row"><label>RSI</label><span>${s.indicators?.rsi ?? '—'}</span></div>
         <div class="compare-row"><label>均線排列</label><span>${s.indicators?.ma20 && s.indicators?.ma60 ? (s.indicators.ma20 > s.indicators.ma60 ? '多頭' : '空頭') : '—'}</span></div>
         <div class="compare-row"><label>月KD K</label><span>${s.indicators?.month_k != null ? fmt(s.indicators.month_k, 1) : '—'}</span></div>
