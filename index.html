@@ -21,6 +21,33 @@ a{color:var(--blue);text-decoration:none;}a:hover{text-decoration:underline;}
 button{cursor:pointer;font-family:inherit;}
 input,select{font-family:inherit;}
 
+/* ── Strategy Memo ── */
+.strategy-memo-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);}
+.strategy-memo-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;cursor:pointer;user-select:none;}
+.strategy-memo-header:hover{background:var(--card2);}
+.strategy-memo-title{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;}
+.strategy-memo-meta{font-size:11px;color:var(--text3);}
+.strategy-memo-body{padding:0 18px 16px;border-top:1px solid var(--border);display:none;}
+.strategy-memo-body.open{display:block;}
+.strategy-textarea{width:100%;min-height:100px;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:12px;font-family:'Noto Sans TC',sans-serif;color:var(--text);background:var(--card2);resize:vertical;outline:none;margin-top:10px;line-height:1.6;}
+.strategy-textarea:focus{border-color:var(--blue);}
+.strategy-active-badge{font-size:10px;padding:2px 7px;border-radius:20px;background:rgba(59,130,246,.1);color:var(--blue);font-weight:600;}
+
+/* ── Market Analysis ── */
+.mkt-analyze-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);}
+.mkt-tab-row{display:flex;gap:6px;margin-bottom:14px;}
+.mkt-a-tab{background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:5px 14px;font-size:12px;color:var(--text2);cursor:pointer;transition:all .15s;}
+.mkt-a-tab.active{background:var(--text);border-color:var(--text);color:#fff;}
+.mkt-price-row{display:flex;align-items:baseline;gap:10px;margin-bottom:6px;}
+.mkt-price{font-family:'JetBrains Mono',monospace;font-size:clamp(24px,4vw,36px);font-weight:700;}
+.mkt-ind-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin:12px 0;}
+.mkt-ind{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;}
+.mkt-ind label{font-size:10px;color:var(--text3);text-transform:uppercase;display:block;margin-bottom:3px;}
+.mkt-ind span{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:600;}
+.mkt-pos-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
+.mkt-ai-box{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-top:12px;font-size:13px;color:var(--text);line-height:1.7;}
+.mkt-ai-loading{color:var(--text3);font-size:12px;padding:8px 0;}
+
 /* ── Layout ── */
 .page-wrap{max-width:1280px;margin:0 auto;padding:0 16px 48px;}
 section{margin-bottom:32px;}
@@ -468,6 +495,27 @@ section{margin-bottom:32px;}
   <div class="tickers-updated" id="tickers-updated"></div>
 </section>
 
+<!-- ── 大盤技術分析 ── -->
+<section id="mkt-analyze-section">
+  <div class="section-header">
+    <div class="section-title-row">
+      <div class="section-icon">📈</div>
+      <div>
+        <div class="section-label">大盤技術分析</div>
+        <div class="section-sub">加權指數均線、MACD、月KD、RSI</div>
+      </div>
+    </div>
+  </div>
+  <div class="mkt-analyze-wrap">
+    <div class="mkt-tab-row">
+      <button class="mkt-a-tab active" onclick="loadMktAnalyze('twii')">🇹🇼 台灣加權</button>
+      <button class="mkt-a-tab" onclick="loadMktAnalyze('spx')">S&amp;P 500</button>
+      <button class="mkt-a-tab" onclick="loadMktAnalyze('ixic')">那斯達克</button>
+    </div>
+    <div id="mkt-analyze-content"><div class="mkt-ai-loading">載入中…</div></div>
+  </div>
+</section>
+
 <!-- ── Phase 1: Daily Focus ── -->
 <section id="focus-section">
   <div class="section-header">
@@ -540,6 +588,44 @@ section{margin-bottom:32px;}
 </section>
 
 <!-- ── Analyze ── -->
+<section>
+  <div class="section-header">
+    <div class="section-title-row">
+      <div class="section-icon">📋</div>
+      <div>
+        <div class="section-label">市場策略備忘 <span id="strategy-badge" style="display:none" class="strategy-active-badge">已載入</span></div>
+        <div class="section-sub">貼上投顧報告重點，AI 分析時自動帶入市場背景</div>
+      </div>
+    </div>
+  </div>
+  <div class="strategy-memo-wrap">
+    <div class="strategy-memo-header" onclick="toggleStrategyMemo()">
+      <div class="strategy-memo-title">📌 點擊展開 / 新增策略報告</div>
+      <div class="strategy-memo-meta" id="strategy-updated-at"></div>
+    </div>
+    <div class="strategy-memo-body" id="strategy-memo-body">
+      <!-- 新增輸入 -->
+      <div style="margin-top:10px;">
+        <div style="display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
+          <input id="strategy-source" placeholder="來源（如：富邦投顧）" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;width:140px;background:var(--card2);color:var(--text);outline:none;">
+          <input id="strategy-date" type="date" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;background:var(--card2);color:var(--text);outline:none;">
+        </div>
+        <textarea class="strategy-textarea" id="strategy-textarea" style="min-height:80px;" placeholder="貼上這份報告的重點策略內容…"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <button onclick="addStrategyEntry()" style="background:var(--blue);border:none;border-radius:8px;padding:7px 16px;color:#fff;font-size:12px;font-weight:500;cursor:pointer;">＋ 新增並整合</button>
+          <button onclick="clearAllStrategy()" style="background:none;border:1px solid var(--border);border-radius:8px;padding:7px 14px;font-size:12px;color:var(--text2);cursor:pointer;">清除全部</button>
+        </div>
+      </div>
+      <!-- 整合觀點 -->
+      <div id="strategy-synthesis-area" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);">
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">AI 整合觀點 <span id="strategy-count" style="color:var(--blue)"></span></div>
+        <div id="strategy-synthesis" style="font-size:12px;color:var(--text);line-height:1.8;white-space:pre-line;background:var(--card2);padding:10px 12px;border-radius:8px;"></div>
+        <div id="strategy-sources" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:5px;"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section>
   <div class="section-header">
     <div class="section-title-row">
@@ -623,7 +709,95 @@ window.addEventListener('DOMContentLoaded', () => {
   fetchMarketData();
   loadFocus(null);
   renderWatchlist();
+  loadMktAnalyze('twii');
+  loadStrategyEntries();
+  updateStrategyUI();
 });
+
+// ── 大盤技術分析 ─────────────────────────────────────────────────
+let _mktAICache = {};
+
+async function loadMktAnalyze(mkt) {
+  document.querySelectorAll('.mkt-a-tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.mkt-a-tab').forEach(b => { if (b.textContent.includes(mkt === 'twii' ? '台灣' : mkt === 'spx' ? 'S&P' : '那斯達克')) b.classList.add('active'); });
+  const area = document.getElementById('mkt-analyze-content');
+  area.innerHTML = '<div class="mkt-ai-loading">技術指標載入中…</div>';
+  try {
+    const res = await fetch(`/api/market-analyze?market=${mkt}`);
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || 'failed');
+    renderMktAnalyze(d, area);
+    fetchMktAI(d, area);
+  } catch(e) {
+    area.innerHTML = `<div style="color:var(--text2);font-size:12px">載入失敗：${e.message}</div>`;
+  }
+}
+
+function renderMktAnalyze(d, area) {
+  const ind = d.indicators, p = d.price;
+  const up = p.change_percent > 0, down = p.change_percent < 0;
+  const cc = d.market === 'twii' ? (up?'tw-up':down?'tw-down':'') : (up?'us-up':down?'us-down':'');
+  const cs = up ? '+' : '';
+  const priceStr = (p.close||0).toLocaleString('en', {maximumFractionDigits: d.market==='twii'?2:2});
+  const maTags = (ind.ma_position||[]).map(t =>
+    `<span class="ma-tag ${t.startsWith('站上')?'above':'below'}">${t}</span>`).join('');
+  const rsiC = ind.rsi < 30 ? 'var(--green)' : ind.rsi > 70 ? 'var(--red)' : 'var(--text)';
+  const kdC  = ind.month_k < 25 ? 'var(--green)' : ind.month_k > 75 ? 'var(--yellow)' : 'var(--text)';
+
+  area.innerHTML = `
+    <div class="mkt-price-row">
+      <span class="mkt-price ${cc}">${priceStr}</span>
+      <span class="price-change ${cc}" style="font-size:14px">${p.change_percent!=null?cs+p.change_percent+'%':''}</span>
+      <span style="font-size:11px;color:var(--text3)">${d.currency} ｜ ${d.updated}</span>
+    </div>
+    <div class="mkt-ind-row">
+      <div class="mkt-ind"><label>月線 MA20</label><span>${ind.ma20!=null?ind.ma20.toLocaleString():'—'}</span></div>
+      <div class="mkt-ind"><label>季線 MA60</label><span>${ind.ma60!=null?ind.ma60.toLocaleString():'—'}</span></div>
+      <div class="mkt-ind"><label>半年線 MA120</label><span>${ind.ma120!=null?ind.ma120.toLocaleString():'—'}</span></div>
+      <div class="mkt-ind"><label>年線 MA240</label><span>${ind.ma240!=null?ind.ma240.toLocaleString():'—'}</span></div>
+      <div class="mkt-ind"><label>RSI(14)</label><span style="color:${rsiC}">${ind.rsi!=null?ind.rsi:'—'}</span></div>
+      <div class="mkt-ind"><label>月KD K值</label><span style="color:${kdC}">${ind.month_k!=null?ind.month_k:'—'}</span></div>
+      <div class="mkt-ind"><label>MACD柱</label><span style="color:${(ind.macd_hist||0)>0?'var(--green)':'var(--red)'}">${ind.macd_hist!=null?ind.macd_hist:'—'}</span></div>
+      <div class="mkt-ind"><label>52週高</label><span>${ind.high_52w!=null?ind.high_52w.toLocaleString():'—'}</span></div>
+      <div class="mkt-ind"><label>52週低</label><span>${ind.low_52w!=null?ind.low_52w.toLocaleString():'—'}</span></div>
+    </div>
+    <div class="mkt-pos-tags">${maTags}</div>
+    <div class="mkt-ai-box" id="mkt-ai-result"><span style="color:var(--text3);font-size:12px">AI 大盤分析中…</span></div>`;
+}
+
+async function fetchMktAI(d, area) {
+  const apiKey = null; // 用 ai-zone 的 server-side key
+  try {
+    const res = await fetch('/api/mkt-ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(d),
+    });
+    const result = await res.json();
+    const el = document.getElementById('mkt-ai-result');
+    if (el && result.summary) el.innerHTML = result.summary;
+  } catch(_) {
+    const el = document.getElementById('mkt-ai-result');
+    if (el) el.innerHTML = generateMktFallback(d);
+  }
+}
+
+function generateMktFallback(d) {
+  const ind = d.indicators, p = d.price;
+  const lines = [];
+  if (ind.ma_position?.length) lines.push(`目前${ind.ma_position.join('、')}。`);
+  if (ind.macd_hist != null) lines.push(ind.macd_hist > 0 ? 'MACD 柱狀為正，動能偏多。' : 'MACD 柱狀為負，動能偏空，留意賣壓。');
+  if (ind.rsi != null) {
+    if (ind.rsi < 30) lines.push(`RSI ${ind.rsi} 超賣，有技術性反彈空間。`);
+    else if (ind.rsi > 70) lines.push(`RSI ${ind.rsi} 偏高，短線留意回檔。`);
+    else lines.push(`RSI ${ind.rsi} 中性區間。`);
+  }
+  if (ind.month_k != null) {
+    if (ind.month_k < 25) lines.push(`月KD K值 ${ind.month_k}，長線低檔有支撐。`);
+    else if (ind.month_k > 80) lines.push(`月KD K值 ${ind.month_k}，長線高檔留意震盪。`);
+  }
+  return lines.join(' ') || '技術指標資料已載入。';
+}
 
 // ── Phase 1: Market Tickers ──────────────────────────────────────
 async function fetchMarketData() {
@@ -981,6 +1155,7 @@ async function fetchAnalystData(data) {
     const res = await fetch('/api/analyst?' + params);
     const analyst = await res.json();
     if (!res.ok || analyst.error) throw new Error(analyst.error || 'failed');
+    if (!analyst.available) throw new Error('no data');
     _lastAnalyst = analyst;
     if (el) el.outerHTML = renderAnalystHTML(analyst);
     return analyst;
@@ -1095,7 +1270,7 @@ async function fetchAIZone(data, analyst) {
   try {
     const res = await fetch('/api/ai-zone', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...data, analyst }), signal: controller.signal
+      body: JSON.stringify({ ...data, analyst, market_context: getStrategyMemo() }), signal: controller.signal
     });
     clearTimeout(timer);
     const bz = await res.json();
@@ -1110,7 +1285,7 @@ async function fetchAIZone(data, analyst) {
       <div style="padding:14px 18px;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
           <span style="font-size:10px;background:rgba(245,158,11,.1);color:var(--yellow);padding:2px 8px;border-radius:20px;font-weight:700;">${isTimeout ? 'TIMEOUT' : 'ERROR'}</span>
-          <span style="font-size:13px;font-weight:600;color:var(--text);">AI 技術面評估</span>
+          <span style="font-size:13px;font-weight:600;color:var(--text);">結論與操作建議</span>
         </div>
         <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">
           ${isTimeout ? 'AI 分析逾時，已先顯示技術指標資料。你可以稍後重新分析。' : 'AI 分析暫時不可用，以下為技術指標摘要。'}
@@ -1585,6 +1760,106 @@ function renderThemes(d) {
     ${avoidHtml ? `<div class="watch-section"><div class="watch-title">⚠️ 目前應避開族群</div><div class="watch-chips avoid-chips">${avoidHtml}</div></div>` : ''}
     ${newsHtml ? `<div class="watch-section"><div class="watch-title">📰 參考新聞來源</div>${newsHtml}</div>` : ''}
     <div class="themes-updated">掃描時間：${new Date().toLocaleString('zh-TW')}</div>`;
+}
+
+// ── Strategy Memo ────────────────────────────────────────────────────
+let _strategyEntries = [];
+
+function loadStrategyEntries() {
+  try { _strategyEntries = JSON.parse(localStorage.getItem('strategy_entries') || '[]'); } catch(_) { _strategyEntries = []; }
+}
+function saveStrategyEntries() {
+  localStorage.setItem('strategy_entries', JSON.stringify(_strategyEntries));
+}
+
+function toggleStrategyMemo() {
+  document.getElementById('strategy-memo-body').classList.toggle('open');
+}
+
+async function addStrategyEntry() {
+  const content = document.getElementById('strategy-textarea').value.trim();
+  const source  = document.getElementById('strategy-source').value.trim() || '未知來源';
+  const date    = document.getElementById('strategy-date').value || new Date().toISOString().split('T')[0];
+  if (!content) { alert('請貼上策略內容'); return; }
+
+  loadStrategyEntries();
+  _strategyEntries.push({ date, source, content, added: new Date().toISOString() });
+  saveStrategyEntries();
+
+  // Clear input
+  document.getElementById('strategy-textarea').value = '';
+  document.getElementById('strategy-source').value = '';
+
+  // AI 整合
+  await mergeStrategies();
+  updateStrategyUI();
+}
+
+async function mergeStrategies() {
+  const synthEl = document.getElementById('strategy-synthesis');
+  const areaEl  = document.getElementById('strategy-synthesis-area');
+  if (!_strategyEntries.length) return;
+
+  if (areaEl) areaEl.style.display = 'block';
+  if (synthEl) synthEl.textContent = 'AI 整合中…';
+
+  try {
+    const res = await fetch('/api/strategy-merge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entries: _strategyEntries }),
+    });
+    const data = await res.json();
+    if (data.synthesis) {
+      localStorage.setItem('strategy_synthesis', data.synthesis);
+      if (synthEl) synthEl.textContent = data.synthesis;
+    }
+  } catch(e) {
+    // fallback: just show latest entry
+    const last = _strategyEntries[_strategyEntries.length - 1];
+    const fallback = last?.content || '';
+    localStorage.setItem('strategy_synthesis', fallback);
+    if (synthEl) synthEl.textContent = fallback;
+  }
+}
+
+function clearAllStrategy() {
+  if (!confirm('確定清除所有策略歷史記錄？')) return;
+  _strategyEntries = [];
+  saveStrategyEntries();
+  localStorage.removeItem('strategy_synthesis');
+  updateStrategyUI();
+}
+
+function updateStrategyUI() {
+  loadStrategyEntries();
+  const synthesis = localStorage.getItem('strategy_synthesis');
+  const badge   = document.getElementById('strategy-badge');
+  const metaEl  = document.getElementById('strategy-updated-at');
+  const areaEl  = document.getElementById('strategy-synthesis-area');
+  const synthEl = document.getElementById('strategy-synthesis');
+  const countEl = document.getElementById('strategy-count');
+  const srcEl   = document.getElementById('strategy-sources');
+
+  if (_strategyEntries.length > 0) {
+    if (badge) badge.style.display = 'inline';
+    const last = _strategyEntries[_strategyEntries.length - 1];
+    if (metaEl) metaEl.textContent = `${_strategyEntries.length} 份報告 ｜ 最新：${last.source} ${last.date}`;
+    if (areaEl) areaEl.style.display = 'block';
+    if (synthEl && synthesis) synthEl.textContent = synthesis;
+    if (countEl) countEl.textContent = `（共 ${_strategyEntries.length} 份）`;
+    if (srcEl) srcEl.innerHTML = _strategyEntries.map(e =>
+      `<span style="font-size:10px;padding:2px 8px;background:var(--card2);border:1px solid var(--border);border-radius:20px;color:var(--text2);">${e.source} ${e.date}</span>`
+    ).join('');
+  } else {
+    if (badge) badge.style.display = 'none';
+    if (metaEl) metaEl.textContent = '';
+    if (areaEl) areaEl.style.display = 'none';
+  }
+}
+
+function getStrategyMemo() {
+  return localStorage.getItem('strategy_synthesis') || null;
 }
 
 // ── Utils ─────────────────────────────────────────────────────────
