@@ -11,7 +11,7 @@ module.exports = async function handler(req, res) {
   let body = req.body;
   if (typeof body === "string") { try { body = JSON.parse(body); } catch (_) {} }
 
-  const { stock_id, name, market, currency, price, indicators, signal, valuation, monthly_revenue, institutional, analyst } = body || {};
+  const { stock_id, name, market, currency, price, indicators, signal, valuation, monthly_revenue, institutional, analyst, market_context } = body || {};
   if (!stock_id) return res.status(400).json({ error: "缺少 stock_id" });
 
   const isUS = market === "us";
@@ -64,6 +64,7 @@ ${valStr}
 ${monthly_revenue ? `月營收年增率：${monthly_revenue.yoy}%  月增率：${monthly_revenue.mom}%` : ""}
 ${chipStr ? `籌碼面（三大法人）：${chipStr}` : ""}
 ${analystStr ? `分析師共識：${analystStr}` : ""}
+${market_context ? `\n【當前市場策略背景】\n${market_context.slice(0,500)}\n請在建議中參考以上市場環境與策略方向。` : ""}
 多方${signal?.bullScore}  空方${signal?.bearScore}  ${signal?.summary}
 
 只輸出以下 JSON，不要其他文字，所有字串值不含雙引號或換行符號：
