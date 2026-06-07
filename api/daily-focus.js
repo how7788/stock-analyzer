@@ -23,16 +23,19 @@ function getSource(url) {
 // daysParam: 1 = 今日（近24h），2 = 昨日（近48h）
 async function fetchNews(tavilyKey, daysParam) {
   const queries = [
+    "台股 大盤 指數 今日 重要消息 漲跌",
+    "台指期貨 夜盤 熔斷 大跌 大漲 最新",
     "台股 AI伺服器 半導體 強勢族群 產業焦點",
     "台積電 聯發科 鴻海 廣達 最新消息",
     "台股 資金輪動 題材 法人買賣 重點",
     "美國科技股 AI 半導體 聯準會 最新消息 中文",
-    "NVIDIA 台積電ADR 輝達 蘋果供應鏈 中文財經",
     "聯準會 利率 美債殖利率 通膨 美元指數 中文",
-    "美國 CPI 就業 GDP 台股影響 總經 中文",
   ];
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 9000);
+  const now = Date.now();
+  const MS_2D = 2 * 86400000;
+
   try {
     const results = await Promise.all(queries.map(q =>
       fetch("https://api.tavily.com/search", {
@@ -42,37 +45,63 @@ async function fetchNews(tavilyKey, daysParam) {
         body: JSON.stringify({
           api_key: tavilyKey, query: q,
           search_depth: "basic", max_results: 5,
-          days: daysParam,   // ← 今日=1，昨日=2
+          days: daysParam,
         }),
       }).then(r => r.json()).catch(() => ({ results: [] }))
     ));
     clearTimeout(timer);
     const seen = new Set();
-    const articles = [];
+    const fresh = [], stale = [];
+
     for (const r of results) {
       for (const item of (r.results || [])) {
-        const url = item.url || '', content = item.content || '';
-        if (!seen.has(url) && content.length > 100) {
+        const url = item.url || '', snippet = item.content || '';
+        if (!seen.has(url) && snippet.length > 100) {
           seen.add(url);
-          articles.push({
-            title: item.title || '', url, snippet: content.slice(0, 400),
+          // ── 嚴格日期驗證 ──
+          let pubTs = null;
+          if (item.published_date) {
+            try { const d = new Date(item.published_date); if (!isNaN(d)) pubTs = d.getTime(); } catch(_) {}
+          }
+          const art = {
+            title: item.title || '', url, snippet: snippet.slice(0, 400),
             source: getSource(url), published: item.published_date || null,
-          });
+            pubTs,
+          };
+          // 有日期且在 2 天內 → fresh；無日期或較舊 → stale（附加但降權）
+          if (pubTs && (now - pubTs) <= MS_2D) fresh.push(art);
+          else stale.push(art);
         }
       }
     }
-    return articles.slice(0, 12);
+
+    // 優先用有明確近期日期的文章，不足才補 stale
+    const pool = [...fresh];
+    if (pool.length < 6) pool.push(...stale.slice(0, 8 - pool.length));
+    return pool.slice(0, 10);
   } catch (_) { clearTimeout(timer); return []; }
 }
 
 async function analyzeWithClaude(apiKey, articles, targetDate) {
   const newsText = articles.length
-    ? articles.map((a, i) => `[${i + 1}] 來源:${a.source}\n標題:${a.title}\n內容:${a.snippet}`).join('\n\n')
-    : '（無新聞，請根據近期市場知識生成）';
+    ? articles.map((a, i) => {
+        const dateStr = a.published ? a.published.slice(0,10) : '日期未知';
+        return `[${i + 1}] 來源:${a.source} | 日期:${dateStr}\n標題:${a.title}\n內容:${a.snippet}`;
+      }).join('\n\n')
+    : '（今日無新聞資料）';
 
-  const prompt = `你是台股產業分析師。根據以下近期新聞，整理出${targetDate}最重要的4個產業焦點，每個聚焦一個核心題材與族群。
+  // 今天日期用於讓 Claude 判斷新舊
+  const todayStr = new Date().toISOString().split('T')[0];
 
-新聞資料：
+  const prompt = `你是台股產業分析師。今天是 ${todayStr}。根據以下今日最新新聞，整理出${targetDate}最重要的4個產業焦點，每個聚焦一個核心題材與族群。
+
+【重要規則】
+1. 只根據下方新聞內容，嚴禁使用訓練資料補充
+2. 若文章提到的指數點位、事件、時間明顯不符合今日（${todayStr}），請跳過該文章
+3. 若新聞不足，寧可縮短摘要，也不要編造或引用過時資料
+4. 每張卡片的 summary 必須來自實際新聞內容
+
+新聞資料（各文章附有來源與發布日期，請優先使用日期最近的）：
 ${newsText}
 
 只輸出以下 JSON，不含任何其他文字，所有字串值不含雙引號或換行符號：
@@ -90,7 +119,7 @@ ${newsText}
   ]
 }
 
-規則：cards 固定4個，涵蓋不同產業面向；source 用實際新聞來源；summary 約100字；sectors 2-3個台股板塊名稱；color 從 blue/green/amber/purple/red/teal 選一個。`;
+規則：cards 固定4個，涵蓋不同產業面向；source 用實際新聞來源；summary 約100字；sectors 2-3個台股板塊名稱；color 從 blue/green/amber/purple/red/teal 選一個。重要：只使用上方提供的新聞內容，若新聞中出現明顯過時的數字或事件（如舊點位、舊消息），請跳過該新聞改選其他較新的內容。`;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 22000);
@@ -129,8 +158,8 @@ function getAvailableDates() {
   yesterday.setDate(yesterday.getDate() - 1);
 
   return [
-    { label: '今日', value: fmt(today), days: 2 },
-    { label: '前日', value: fmt(yesterday), days: 3 },
+    { label: '今日', value: fmt(today), days: 1 },
+    { label: '前日', value: fmt(yesterday), days: 2 },
   ];
 }
 
