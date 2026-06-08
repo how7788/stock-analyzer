@@ -846,14 +846,43 @@ function renderTickers(data, updated) {
 // ── Phase 1: Daily Focus ─────────────────────────────────────────
 let focusDates = [];
 
-async function loadFocus(dateVal) {
+async function loadFocus(dateVal, forceRefresh) {
   const area = document.getElementById('focus-cards-area');
+  const CACHE_MS = 2 * 60 * 60 * 1000; // 2小時快取
+  const cacheKey = 'focus_' + (dateVal || 'today');
+  const cacheTs  = 'focus_ts_' + (dateVal || 'today');
+
+  // 用快取（非強制刷新，且快取未過期）
+  if (!forceRefresh) {
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      const ts = parseInt(localStorage.getItem(cacheTs) || '0');
+      if (cached && Date.now() - ts < CACHE_MS) {
+        const data = JSON.parse(cached);
+        if (data.available_dates?.length) renderFocusTabs(data.available_dates, dateVal);
+        renderFocusCards(data);
+        // 顯示快取提示
+        const tabsEl = document.getElementById('focus-date-tabs');
+        if (tabsEl && !tabsEl.querySelector('.cache-note')) {
+          const note = document.createElement('span');
+          note.className = 'cache-note';
+          note.style.cssText = 'font-size:10px;color:var(--text3);margin-left:6px;';
+          note.innerHTML = `快取 <button onclick="loadFocus('${dateVal||''}', true)" style="background:none;border:none;color:var(--blue);font-size:10px;cursor:pointer;padding:0;">重新載入</button>`;
+          tabsEl.appendChild(note);
+        }
+        return;
+      }
+    } catch(_) {}
+  }
+
   area.innerHTML = '<div class="focus-loading"><div class="focus-skeleton"></div><div class="focus-skeleton"></div><div class="focus-skeleton"></div><div class="focus-skeleton"></div></div>';
   try {
     const url = dateVal ? `/api/daily-focus?date=${dateVal}` : '/api/daily-focus';
     const res = await fetch(url);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed');
+    // 存快取
+    try { localStorage.setItem(cacheKey, JSON.stringify(data)); localStorage.setItem(cacheTs, Date.now().toString()); } catch(_) {}
     if (data.available_dates && data.available_dates.length) renderFocusTabs(data.available_dates, dateVal);
     renderFocusCards(data);
   } catch(e) {
