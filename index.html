@@ -1814,6 +1814,47 @@ function generateFallbackSummary(data, strategy) {
   return parts.filter(Boolean).join('<br>');
 }
 
+async function fetchStockSummary(data, strategy) {
+  const el = document.getElementById('summary-ai-line');
+  if (!el) return;
+  el.innerHTML = '<span style="color:var(--text3);font-size:12px;">AI 判斷生成中…</span>';
+  try {
+    const res = await fetch('/api/mkt-ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'stock',
+        stock_id: data.stock_id,
+        name: data.name,
+        market: data.market,
+        price: data.price,
+        indicators: data.indicators,
+        valuation: data.valuation,
+        strategy: strategy ? { totalScore: strategy.totalScore, action: strategy.action } : null,
+      }),
+    });
+    const json = await res.json();
+    if (json.summary) {
+      const vc = strategy ? ({ can_accumulate:'var(--green)', watch_wait:'var(--yellow)', do_not_chase:'var(--orange)', high_risk:'var(--red)' }[strategy.action] || 'var(--text)') : 'var(--text)';
+      const vl = strategy?.actionLabel || '';
+      el.style.borderTop = '1px solid var(--border)';
+      el.style.paddingTop = '12px';
+      el.style.marginTop = '4px';
+      el.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+          <div style="font-size:16px;font-weight:700;color:${vc};">${vl}</div>
+          ${strategy?.totalScore != null ? '<span style="font-size:13px;font-weight:700;">' + strategy.totalScore + ' / 100</span>' : ''}
+        </div>
+        <div style="font-size:13px;color:var(--text);line-height:1.8;">${json.summary}</div>
+        ${strategy?.batches?.length ? '<div style="font-size:12px;color:var(--text2);background:var(--card2);padding:8px 12px;border-radius:8px;margin-top:8px;">📌 ' + strategy.batches.map(b=>b.label+'：'+b.range).join('　') + '</div>' : ''}
+        ${strategy?.stopLoss?.length ? '<div style="font-size:12px;color:var(--yellow);margin-top:6px;">⚠️ ' + strategy.stopLoss[0] + '</div>' : ''}
+      `;
+    }
+  } catch(_) {
+    if (el) el.innerHTML = '<span style="color:var(--text3);font-size:12px;">AI 判斷暫時不可用</span>';
+  }
+}
+
 async function fetchAIZone(data, analyst) {
   _lastAIData = data;
 
@@ -1824,6 +1865,9 @@ async function fetchAIZone(data, analyst) {
     strategy = calculateStrategy(data, _lastNewsArticles || []);
     if (strategyEl) strategyEl.outerHTML = renderStrategySection(strategy);
   } catch(e) { if (strategyEl) strategyEl.remove(); }
+
+  // 立即啟動綜合總結 AI（輕量，獨立於 ai-zone）
+  fetchStockSummary(data, strategy);
   const el = document.getElementById('ai-zone-placeholder');
   if (!el) return;
   const cur = data.currency || (data.market === 'us' ? 'USD' : 'TWD');
@@ -1855,8 +1899,7 @@ async function fetchAIZone(data, analyst) {
         <div style="font-size:13px;color:var(--text);line-height:1.7;padding:10px 12px;background:var(--card2);border-radius:8px;margin-bottom:10px;">${fallback}</div>
         <button onclick="reanalyzeAI()" style="background:var(--blue);border:none;border-radius:8px;padding:7px 16px;color:#fff;font-size:12px;font-weight:500;cursor:pointer;">↺ 重新分析</button>
       </div>`;
-    const sumEl = document.getElementById('summary-ai-line');
-    if (sumEl) { sumEl.textContent = 'AI 分析暫時不可用，以上為技術指標與基本面資料。'; sumEl.style.color = 'var(--text3)'; }
+    // fetchStockSummary 已獨立處理綜合總結，此處不需重複
   }
 }
 
