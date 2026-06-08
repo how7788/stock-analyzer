@@ -1561,6 +1561,85 @@ function calcNewsStrategyV2(articles) {
   return { score, status, ok, fail, name: '新聞催化', classified };
 }
 
+// ── 布林通道策略 ─────────────────────────────────────────────
+function calcBollingerStrategy(price, ind) {
+  if (!isNum(price) || !isNum(ind.boll_upper) || !isNum(ind.boll_lower))
+    return { score: null, status: 'insufficient_data', ok: [], fail: [], name: '布林通道' };
+
+  const upper = ind.boll_upper, lower = ind.boll_lower;
+  const mid = (upper + lower) / 2;
+  const bandwidth = (upper - lower) / mid * 100;
+  const ok = [], fail = [];
+
+  // 現價在布林帶的相對位置（0=下軌，100=上軌）
+  const pos = Math.round((price - lower) / (upper - lower) * 100);
+
+  let score = 50;
+
+  if (pos <= 10) {
+    score = 88; ok.push(`現價貼近布林下軌（超賣），有支撐反彈機會`);
+  } else if (pos <= 25) {
+    score = 75; ok.push(`現價在布林下半段（${pos}%），接近支撐區`);
+  } else if (pos <= 50) {
+    score = 60; ok.push(`現價在布林中下段（${pos}%），中性偏低`);
+  } else if (pos <= 75) {
+    score = 45; ok.push(`現價在布林中上段（${pos}%），偏高區間`);
+  } else if (pos <= 90) {
+    score = 30; fail.push(`現價在布林上半段（${pos}%），短線偏貴`);
+  } else {
+    score = 15; fail.push(`現價突破或貼近布林上軌（${pos}%），短線過熱`);
+  }
+
+  // 帶寬判斷
+  if (bandwidth < 5) {
+    ok.push(`布林帶收窄（帶寬 ${bandwidth.toFixed(1)}%），可能醞釀突破`);
+    score = Math.min(score + 10, 95);
+  } else if (bandwidth > 20) {
+    fail.push(`布林帶極寬（帶寬 ${bandwidth.toFixed(1)}%），波動劇烈`);
+  }
+
+  const status = score >= 70 ? 'bullish' : score >= 45 ? 'neutral' : 'bearish';
+  return { score, status, ok, fail, name: '布林通道' };
+}
+
+// ── 月KD 獨立策略 ──────────────────────────────────────────
+function calcMonthlyKDStrategy(ind) {
+  if (!isNum(ind.month_k) || !isNum(ind.month_d))
+    return { score: null, status: 'insufficient_data', ok: [], fail: [], name: '月KD 長線' };
+
+  const k = ind.month_k, d = ind.month_d;
+  const ok = [], fail = [];
+  let score;
+
+  if (k < 20) {
+    score = 90;
+    ok.push(`月KD K值 ${k}，長線低檔超賣，中長期罕見買點`);
+    if (k > d) ok.push('K值反轉向上，黃金交叉訊號');
+  } else if (k < 35) {
+    score = 75;
+    ok.push(`月KD K值 ${k}，長線低位區，可逢低分批`);
+  } else if (k < 55) {
+    score = 55;
+    ok.push(`月KD K值 ${k}，中性區間`);
+  } else if (k < 75) {
+    score = 40;
+    fail.push(`月KD K值 ${k}，中高位區，謹慎追高`);
+  } else if (k < 85) {
+    score = 22;
+    fail.push(`月KD K值 ${k}，長線高檔，短線回檔機率高`);
+  } else {
+    score = 10;
+    fail.push(`月KD K值 ${k}，長線極度過熱（歷史高位），強制警示`);
+  }
+
+  // 死叉/黃金交叉
+  if (k < d && k > 50) fail.push(`K值 ${k} < D值 ${d}，死叉偏空`);
+  else if (k > d && k < 50) ok.push(`K值 ${k} > D值 ${d}，黃金交叉偏多`);
+
+  const status = score >= 70 ? 'bullish' : score >= 45 ? 'neutral' : 'bearish';
+  return { score, status, ok, fail, name: '月KD 長線' };
+}
+
 // ── 綜合策略計算 ─────────────────────────────────────────────
 function calculateStrategy(data, articles) {
   const price = data.price?.close;
@@ -1595,13 +1674,19 @@ function calculateStrategy(data, articles) {
   // Phase 2: 加強版新聞（含情緒分類）
   const s5 = calcNewsStrategyV2(articles);
 
+  // Phase 3: 布林通道 + 月KD 獨立
+  const s7 = calcBollingerStrategy(price, ind);
+  const s8 = calcMonthlyKDStrategy(ind);
+
   const totalScore = weightedAvg([
-    { score: s1.score, w: 25 },
-    { score: s3.score, w: 18 },
-    { score: s4.score, w: 22 },
-    { score: s2.score, w: 13 },
-    { score: s5.score, w: 12 },
-    { score: s6.score, w: 10 },
+    { score: s1.score, w: 20 },
+    { score: s3.score, w: 12 },
+    { score: s4.score, w: 18 },
+    { score: s2.score, w: 12 },
+    { score: s5.score, w: 8  },
+    { score: s6.score, w: 8  },
+    { score: s7.score, w: 12 },
+    { score: s8.score, w: 10 },
   ]);
 
   // ── 強制降級條件 ──
@@ -1642,7 +1727,7 @@ function calculateStrategy(data, articles) {
   if (s5.score !== null && s5.score < 40) risks.push('近期新聞日期偏舊，缺乏新鮮催化');
   risks.push('以上分析僅供研究參考，不構成投資建議');
 
-  return { totalScore, action, actionLabel, actionColor, overheated, strategies: [s1, s2, s3, s4], batches, stopLoss, risks };
+  return { totalScore, action, actionLabel, actionColor, overheated, strategies: [s1, s2, s3, s4, s7, s8], batches, stopLoss, risks };
 }
 
 async function fetchAnalystData(data) {
