@@ -1565,7 +1565,8 @@ function calculateStrategy(data, articles) {
   }
 
   // Phase 2: 股息防守
-  const s6 = calcDividendStrategy(val, ind, rev, divs);
+  let s6 = { score: null, status: 'insufficient_data', ok: [], fail: [], name: '股息防守' };
+  try { s6 = calcDividendStrategy(val, ind, rev, divs); } catch(e) { console.warn('s6 error:', e); }
 
   // Phase 2: 加強版新聞（含情緒分類）
   const s5 = calcNewsStrategyV2(articles);
