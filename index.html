@@ -1577,17 +1577,17 @@ function calcBollingerStrategy(price, ind) {
   let score = 50;
 
   if (pos <= 10) {
-    score = 88; ok.push(`現價貼近布林下軌（超賣），有支撐反彈機會`);
-  } else if (pos <= 25) {
-    score = 75; ok.push(`現價在布林下半段（${pos}%），接近支撐區`);
-  } else if (pos <= 50) {
-    score = 60; ok.push(`現價在布林中下段（${pos}%），中性偏低`);
+    score = 90; ok.push(`現價貼近布林下軌，超賣支撐`);
+  } else if (pos <= 30) {
+    score = 78; ok.push(`現價在布林下段（${pos}%），接近支撐`);
+  } else if (pos <= 55) {
+    score = 65; ok.push(`現價在布林中段（${pos}%），健康位置`);
   } else if (pos <= 75) {
-    score = 45; ok.push(`現價在布林中上段（${pos}%），偏高區間`);
+    score = 52; ok.push(`現價在布林中上段（${pos}%），偏高但未過熱`);
   } else if (pos <= 90) {
-    score = 30; fail.push(`現價在布林上半段（${pos}%），短線偏貴`);
+    score = 38; fail.push(`現價在布林上段（${pos}%），偏貴，等回測`);
   } else {
-    score = 15; fail.push(`現價突破或貼近布林上軌（${pos}%），短線過熱`);
+    score = 22; fail.push(`現價貼近布林上軌（${pos}%），短線過熱`);
   }
 
   // 帶寬判斷
@@ -1613,23 +1613,23 @@ function calcMonthlyKDStrategy(ind) {
 
   if (k < 20) {
     score = 90;
-    ok.push(`月KD K值 ${k}，長線低檔超賣，中長期罕見買點`);
-    if (k > d) ok.push('K值反轉向上，黃金交叉訊號');
+    ok.push(`月KD K值 ${k}，長線低檔，中長期罕見買點`);
+    if (k > d) ok.push('K值反轉向上，黃金交叉');
   } else if (k < 35) {
-    score = 75;
+    score = 78;
     ok.push(`月KD K值 ${k}，長線低位區，可逢低分批`);
-  } else if (k < 55) {
-    score = 55;
-    ok.push(`月KD K值 ${k}，中性區間`);
-  } else if (k < 75) {
-    score = 40;
-    fail.push(`月KD K值 ${k}，中高位區，謹慎追高`);
-  } else if (k < 85) {
-    score = 22;
-    fail.push(`月KD K值 ${k}，長線高檔，短線回檔機率高`);
+  } else if (k < 60) {
+    score = 65;
+    ok.push(`月KD K值 ${k}，中性偏健康`);
+  } else if (k < 78) {
+    score = 50;
+    ok.push(`月KD K值 ${k}，中高位，留意但不必悲觀`);
+  } else if (k < 88) {
+    score = 35;
+    fail.push(`月KD K值 ${k}，長線高檔，短線注意`);
   } else {
-    score = 10;
-    fail.push(`月KD K值 ${k}，長線極度過熱（歷史高位），強制警示`);
+    score = 18;
+    fail.push(`月KD K值 ${k}，長線極高，不宜追價`);
   }
 
   // 死叉/黃金交叉
@@ -1679,14 +1679,14 @@ function calculateStrategy(data, articles) {
   const s8 = calcMonthlyKDStrategy(ind);
 
   const totalScore = weightedAvg([
-    { score: s1.score, w: 20 },
-    { score: s3.score, w: 12 },
-    { score: s4.score, w: 18 },
-    { score: s2.score, w: 12 },
-    { score: s5.score, w: 8  },
-    { score: s6.score, w: 8  },
-    { score: s7.score, w: 12 },
-    { score: s8.score, w: 10 },
+    { score: s1.score, w: 30 },  // 均線多頭排列（技術核心）
+    { score: s2.score, w: 18 },  // 均線回檔承接
+    { score: s3.score, w: 16 },  // RSI/MACD 動能
+    { score: s7.score, w: 14 },  // 布林通道
+    { score: s4.score, w: 10 },  // 估值（降低比重，避免成長股被拖分）
+    { score: s8.score, w: 7  },  // 月KD 長線
+    { score: s5.score, w: 3  },  // 新聞
+    { score: s6.score, w: 2  },  // 股息
   ]);
 
   // ── 強制降級條件 ──
@@ -1696,9 +1696,9 @@ function calculateStrategy(data, articles) {
   let action = 'watch_wait';
   if (totalScore === null) action = 'insufficient_data';
   else if (overheated) action = 'do_not_chase';
-  else if (totalScore >= 75) action = 'can_accumulate';
-  else if (totalScore >= 55) action = 'watch_wait';
-  else if (totalScore >= 40) action = 'watch_wait';
+  else if (totalScore >= 68) action = 'can_accumulate';
+  else if (totalScore >= 50) action = 'watch_wait';
+  else if (totalScore >= 35) action = 'watch_wait';
   else action = 'high_risk';
 
   const actionLabel = { can_accumulate: '🟢 可分批布局', watch_wait: '🟡 觀察等待', do_not_chase: '🟠 偏高不追', high_risk: '🔴 風險偏高', insufficient_data: '⚫ 資料不足' }[action];
