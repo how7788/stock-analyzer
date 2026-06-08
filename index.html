@@ -848,7 +848,7 @@ function renderStrategySection(strategy) {
   // 風險
   const riskRows = risks.map(r => `<div style="font-size:11px;color:var(--text3);padding:1px 0;">• ${r}</div>`).join('');
 
-  return `<div class="res-card" id="strategy-result-section" style="border-left:3px solid ${actionColor};">
+  return `<div class="res-card" id="strategy-result-section">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
       <div>
         <div style="font-size:11px;color:var(--text3);letter-spacing:.5px;margin-bottom:4px;">📊 策略符合度分析</div>
@@ -2089,7 +2089,7 @@ function renderResult(d) {
     </div>` : ''}
 
     <!-- 總結 -->
-    <div class="res-card" style="border-left:4px solid var(--blue);">
+    <div class="res-card">
       <div class="res-card-title">📋 綜合總結</div>
       <div style="font-size:13px;color:var(--text);line-height:1.8;">${generateDataSummary(d)}</div>
       <div id="summary-ai-line" style="font-size:13px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);color:var(--text2);">
