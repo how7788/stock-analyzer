@@ -793,13 +793,18 @@ function renderStrategySection(strategy) {
   const strRows = strategies.map(s => {
     const icon = s.score == null ? '⚫' : s.score >= 75 ? '🟢' : s.score >= 55 ? '🟡' : '🔴';
     const scoreDisp = s.score != null ? `${s.score}/100` : '資料不足';
-    const details = [...(s.ok || []), ...(s.fail || [])].slice(0, 2).join('　');
-    return `<div style="display:flex;align-items:flex-start;gap:6px;padding:5px 0;border-bottom:1px solid var(--border);">
-      <span style="flex:0 0 auto;font-size:12px;">${icon}</span>
+    const okDetails = (s.ok || []).slice(0, 2).map(t => `<span style="color:var(--green);font-size:10px;">✓ ${t}</span>`).join(' ');
+    const failDetails = (s.fail || []).slice(0, 2).map(t => `<span style="color:var(--red);font-size:10px;">✗ ${t}</span>`).join(' ');
+    // News: show pos/neg count if available
+    const newsExtra = s.classified ? ` <span style="font-size:10px;color:var(--green)">↑${s.classified.filter(a=>a.tone==='positive').length}</span><span style="font-size:10px;color:var(--red)"> ↓${s.classified.filter(a=>a.tone==='negative').length}</span>` : '';
+    return `<div style="display:flex;align-items:flex-start;gap:6px;padding:6px 0;border-bottom:1px solid var(--border);">
+      <span style="flex:0 0 auto;font-size:13px;margin-top:1px;">${icon}</span>
       <div style="flex:1;min-width:0;">
-        <span style="font-size:12px;font-weight:600;">${s.name}</span>
-        <span style="font-size:11px;color:var(--text3);margin-left:6px;">${scoreDisp}</span>
-        ${details ? `<div style="font-size:11px;color:var(--text2);margin-top:2px;">${details}</div>` : ''}
+        <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
+          <span style="font-size:12px;font-weight:600;">${s.name}</span>
+          <span style="font-size:11px;color:var(--text3);">${scoreDisp}${newsExtra}</span>
+        </div>
+        ${okDetails || failDetails ? `<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:4px;">${okDetails}${failDetails}</div>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -1419,25 +1424,159 @@ function calcNewsStrategy(articles) {
   return { score, status: score >= 60 ? 'bullish' : 'neutral', ok, fail, name: '新聞催化' };
 }
 
+// ── Phase 2: 股息殖利率防守策略 ─────────────────────────────────
+function calcDividendStrategy(val, ind, rev, dividends) {
+  if (!val || (!isNum(val.yield) && !dividends?.length))
+    return { score: null, status: 'insufficient_data', ok: [], fail: [], name: '股息防守' };
+
+  let pts = 0, max = 0;
+  const ok = [], fail = [], warn = [];
+
+  // 殖利率分數
+  if (isNum(val.yield)) {
+    max += 40;
+    if (val.yield >= 6)      { pts += 38; ok.push(`殖利率 ${val.yield}% 高，防守吸引力強`); }
+    else if (val.yield >= 4) { pts += 28; ok.push(`殖利率 ${val.yield}%，具一定防守性`); }
+    else if (val.yield >= 2) { pts += 16; ok.push(`殖利率 ${val.yield}%，普通`); }
+    else                     { pts += 5;  fail.push(`殖利率 ${val.yield}% 偏低，防守力不足`); }
+  }
+
+  // 高股息陷阱檢查
+  if (isNum(val.yield) && val.yield >= 5) {
+    max += 30;
+    let trapScore = 30;
+    // 股價跌破年線 → 可能是股價下跌造成的假高息
+    if (isNum(ind?.ma240) && isNum(ind?.ma20) && ind.ma20 < ind.ma240 * 0.9)
+      { trapScore -= 20; warn.push('股價可能低於年線，需確認是否為高息陷阱'); }
+    // 月營收年增率衰退
+    if (rev && isNum(rev.yoy) && rev.yoy < -10)
+      { trapScore -= 15; warn.push(`月營收年增率 ${rev.yoy}%，基本面惡化，高息可能不可持續`); }
+    pts += Math.max(0, trapScore);
+  }
+
+  // 近期股利記錄
+  if (dividends?.length) {
+    max += 30;
+    const cashDivs = dividends.filter(d => isNum(d.cash) && d.cash > 0);
+    if (cashDivs.length >= 3) {
+      pts += 28; ok.push(`近 ${cashDivs.length} 次均有現金股利，配息穩定`);
+    } else if (cashDivs.length >= 1) {
+      pts += 16; ok.push(`近期有現金股利紀錄`);
+    } else {
+      fail.push('近期無現金股利');
+    }
+  }
+
+  if (max === 0) return { score: null, status: 'insufficient_data', ok, fail, name: '股息防守' };
+  const score = Math.min(100, Math.round(pts / max * 100));
+  const status = score >= 70 ? 'bullish' : score >= 45 ? 'neutral' : 'bearish';
+  return { score, status, ok, fail: [...fail, ...warn], name: '股息防守' };
+}
+
+// ── Phase 2: 估值分位數（加強版）────────────────────────────────
+function calcValuationPercentile(val) {
+  if (!isNum(val?.per) || !isNum(val?.per_min_1y) || !isNum(val?.per_max_1y)) return null;
+  const range = val.per_max_1y - val.per_min_1y;
+  if (range <= 0) return null;
+  return Math.round((val.per - val.per_min_1y) / range * 100);
+}
+
+// ── Phase 2: 新聞情緒分類 ─────────────────────────────────────
+const POS_KWORDS = ['大單','訂單','合約','受惠','創高','獲利','毛利','成長','超預期','業績','法說正面','展望','擴產','新品','放量','上調','買進','回補','增持','突破'];
+const NEG_KWORDS = ['下修','砍單','庫存','衰退','虧損','訴訟','罰款','降評','賣出','警示','熔斷','暫停','下滑','縮減','取消','違約'];
+
+function classifyNews(articles) {
+  if (!articles?.length) return { pos: 0, neg: 0, stale: 0, fresh: 0, classified: [] };
+  const now = Date.now();
+  let pos = 0, neg = 0, stale = 0, fresh = 0;
+  const classified = articles.map(a => {
+    const text = (a.title || '') + ' ' + (a.snippet || '');
+    const isPos = POS_KWORDS.some(k => text.includes(k));
+    const isNeg = NEG_KWORDS.some(k => text.includes(k));
+    const tone = isPos && !isNeg ? 'positive' : isNeg && !isPos ? 'negative' : 'neutral';
+    let days = 99;
+    if (a.published) { try { days = (now - new Date(a.published).getTime()) / 86400000; } catch(_) {} }
+    const fresh_ = days <= 7;
+    if (fresh_) fresh++; else stale++;
+    if (tone === 'positive') pos++;
+    else if (tone === 'negative') neg++;
+    return { ...a, tone, days: Math.round(days), fresh: fresh_ };
+  });
+  return { pos, neg, stale, fresh, classified };
+}
+
+// ── Phase 2: 加強版新聞催化（含情緒）─────────────────────────
+function calcNewsStrategyV2(articles) {
+  if (!articles?.length) return { score: null, status: 'insufficient_data', ok: [], fail: [], name: '新聞催化', classified: [] };
+  const { pos, neg, stale, fresh, classified } = classifyNews(articles);
+  const total = articles.length;
+  const ok = [], fail = [];
+
+  // 新鮮度分
+  let score = 0;
+  if (fresh === 0) {
+    fail.push('近 7 日無新鮮新聞，所有資料日期偏舊');
+    return { score: 20, status: 'neutral', ok, fail, name: '新聞催化', classified };
+  }
+  score = Math.min(60, Math.round(fresh / total * 60)) + 20;
+
+  // 情緒加分
+  if (pos > neg) {
+    score = Math.min(95, score + Math.min(20, pos * 5));
+    ok.push(`${pos} 篇正面新聞（訂單/獲利/法說等）`);
+  } else if (neg > pos) {
+    score = Math.max(10, score - Math.min(25, neg * 6));
+    fail.push(`${neg} 篇負面新聞（下修/砍單/訴訟等）`);
+  } else {
+    ok.push(`${fresh} 篇近期新聞，情緒中性`);
+  }
+  if (stale > 0) fail.push(`${stale} 篇新聞日期較舊，僅供背景參考`);
+
+  score = Math.min(95, Math.max(10, Math.round(score)));
+  const status = score >= 65 ? 'bullish' : score >= 45 ? 'neutral' : 'bearish';
+  return { score, status, ok, fail, name: '新聞催化', classified };
+}
+
 // ── 綜合策略計算 ─────────────────────────────────────────────
 function calculateStrategy(data, articles) {
   const price = data.price?.close;
   const ind   = data.indicators || {};
   const val   = data.valuation;
+  const rev   = data.monthly_revenue;
+  const divs  = data.dividends;
   const isUS  = data.market === 'us';
 
   const s1 = calcMAAlignStrategy(price, ind);
   const s2 = calcMAPullbackStrategy(price, ind);
   const s3 = calcMomentumStrategy(price, ind);
-  const s4 = calcValuationStrategy(price, ind, val);
-  const s5 = calcNewsStrategy(articles);
+
+  // Phase 2: 加強版估值（含分位數）
+  const s4base = calcValuationStrategy(price, ind, val);
+  const perPct = calcValuationPercentile(val);
+  let s4 = { ...s4base };
+  if (perPct != null) {
+    const pctLabel = perPct >= 80 ? `位於一年高位 ${perPct}%，估值貴` : perPct <= 20 ? `位於一年低位 ${perPct}%，估值便宜` : `位於一年中段 ${perPct}%`;
+    s4.ok = [...(s4base.ok || []), pctLabel];
+    // 分位數高 → 降分，低 → 加分
+    if (s4.score != null) {
+      if (perPct >= 85) s4.score = Math.max(0, s4.score - 15);
+      else if (perPct <= 15) s4.score = Math.min(100, s4.score + 10);
+    }
+  }
+
+  // Phase 2: 股息防守
+  const s6 = calcDividendStrategy(val, ind, rev, divs);
+
+  // Phase 2: 加強版新聞（含情緒分類）
+  const s5 = calcNewsStrategyV2(articles);
 
   const totalScore = weightedAvg([
     { score: s1.score, w: 25 },
-    { score: s3.score, w: 20 },
-    { score: s4.score, w: 25 },
-    { score: s2.score, w: 15 },
-    { score: s5.score, w: 15 },
+    { score: s3.score, w: 18 },
+    { score: s4.score, w: 22 },
+    { score: s2.score, w: 13 },
+    { score: s5.score, w: 12 },
+    { score: s6.score, w: 10 },
   ]);
 
   // ── 強制降級條件 ──
@@ -1478,7 +1617,7 @@ function calculateStrategy(data, articles) {
   if (s5.score !== null && s5.score < 40) risks.push('近期新聞日期偏舊，缺乏新鮮催化');
   risks.push('以上分析僅供研究參考，不構成投資建議');
 
-  return { totalScore, action, actionLabel, actionColor, overheated, strategies: [s1, s2, s3, s4, s5], batches, stopLoss, risks };
+  return { totalScore, action, actionLabel, actionColor, overheated, strategies: [s1, s2, s3, s4, s5, s6], batches, stopLoss, risks };
 }
 
 async function fetchAnalystData(data) {
@@ -1788,11 +1927,28 @@ function renderResult(d) {
           <span style="color:${d.valuation.per && d.valuation.per_avg_1y ? (d.valuation.per > d.valuation.per_avg_1y * 1.1 ? 'var(--red)' : d.valuation.per < d.valuation.per_avg_1y * 0.9 ? 'var(--green)' : 'var(--text)') : 'var(--text)'}">${d.valuation.per != null ? d.valuation.per + 'x' : '—'}</span>
           ${d.valuation.per_avg_1y ? `<div class="sub">一年均值 ${d.valuation.per_avg_1y}x</div>` : ''}
         </div>
-        <div class="ind-item"><label>一年區間</label>
-          <span style="font-size:13px">${d.valuation.per_min_1y != null ? d.valuation.per_min_1y + 'x' : '—'} ～ ${d.valuation.per_max_1y != null ? d.valuation.per_max_1y + 'x' : '—'}</span>
-          ${d.valuation.per && d.valuation.per_avg_1y ? `<div class="sub" style="color:${d.valuation.per > d.valuation.per_avg_1y * 1.1 ? 'var(--red)' : d.valuation.per < d.valuation.per_avg_1y * 0.9 ? 'var(--green)' : 'var(--text2)'}">
-            ${d.valuation.per > d.valuation.per_avg_1y * 1.15 ? '高於均值，估值偏貴' : d.valuation.per < d.valuation.per_avg_1y * 0.9 ? '低於均值，估值偏低' : '接近均值，估值合理'}
-          </div>` : ''}
+        <div class="ind-item" style="grid-column:span 3;">
+          <label>一年估值位置</label>
+          ${(() => {
+            const { per, per_min_1y, per_max_1y, per_avg_1y } = d.valuation;
+            if (per == null || per_min_1y == null || per_max_1y == null) return '<span style="color:var(--text3)">—</span>';
+            const range = per_max_1y - per_min_1y;
+            const pct = range > 0 ? Math.round((per - per_min_1y) / range * 100) : 50;
+            const barColor = pct >= 80 ? 'var(--red)' : pct <= 20 ? 'var(--green)' : 'var(--yellow)';
+            const label = pct >= 80 ? '估值偏高' : pct <= 20 ? '估值偏低' : '估值中段';
+            return \`<div style="margin-top:4px;">
+              <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:3px;">
+                <span>低 \${per_min_1y}x</span>
+                <span style="color:\${barColor};font-weight:600;">現在 \${per}x (\${pct}%) \${label}</span>
+                <span>高 \${per_max_1y}x</span>
+              </div>
+              <div style="height:6px;background:var(--border);border-radius:4px;position:relative;overflow:hidden;">
+                <div style="position:absolute;left:0;top:0;height:100%;width:\${pct}%;background:\${barColor};border-radius:4px;transition:width .4s;"></div>
+                \${per_avg_1y ? \`<div style="position:absolute;top:0;height:100%;width:2px;background:var(--text2);left:\${range > 0 ? Math.round((per_avg_1y - per_min_1y)/range*100) : 50}%;"></div>\` : ''}
+              </div>
+              \${per_avg_1y ? \`<div style="font-size:10px;color:var(--text3);margin-top:2px;">均值 \${per_avg_1y}x（白線）</div>\` : ''}
+            </div>\`;
+          })()}
         </div>
         <div class="ind-item"><label>P/B 淨值比</label><span>${d.valuation.pbr != null ? d.valuation.pbr + 'x' : '—'}</span></div>
         <div class="ind-item"><label>現金殖利率</label><span style="color:var(--green)">${d.valuation.yield != null ? d.valuation.yield + '%' : '—'}</span></div>
@@ -2020,28 +2176,62 @@ function renderBuyZoneHTML(bz, cur) {
 function renderNewsHTML(articles, meta) {
   if (!articles || !articles.length) return `<div class="news-card"><div class="res-card-title">最新新聞輿情</div><div class="news-empty">近14日暫無高相關新聞</div></div>`;
   const insufficient = meta && meta.insufficient;
-  const items = articles.map((a, idx) => {
+  // Phase 2: 情緒分類
+  const { classified } = classifyNews(articles);
+
+  const items = classified.map((a, idx) => {
     let pubStr = '日期未知';
-    let daysOld = null;
-    if (a.published) {
+    let daysOld = a.days ?? null;
+    if (a.published && daysOld === null) {
       try {
         const d = new Date(a.published); if (!isNaN(d)) {
           daysOld = Math.floor((new Date() - d) / 86400000);
-          pubStr = daysOld === 0 ? '今天' : daysOld === 1 ? '昨天' : daysOld < 7 ? daysOld + '天前' : d.toLocaleDateString('zh-TW', { month: '2-digit', day: '2-digit' });
         }
       } catch (_) {}
     }
-    // 插入「不足」分隔線
+    if (daysOld !== null) {
+      pubStr = daysOld === 0 ? '今天' : daysOld === 1 ? '昨天' : daysOld < 7 ? daysOld + '天前' : new Date(a.published).toLocaleDateString('zh-TW', { month: '2-digit', day: '2-digit' });
+    }
+
+    // 情緒標籤
+    const toneTag = a.tone === 'positive'
+      ? `<span style="font-size:10px;padding:1px 6px;border-radius:20px;background:rgba(16,185,129,.1);color:var(--green);font-weight:600;">📈 正面</span>`
+      : a.tone === 'negative'
+      ? `<span style="font-size:10px;padding:1px 6px;border-radius:20px;background:rgba(239,68,68,.08);color:var(--red);font-weight:600;">📉 負面</span>`
+      : `<span style="font-size:10px;padding:1px 6px;border-radius:20px;background:var(--card2);color:var(--text3);">➡️ 中性</span>`;
+
+    // 過舊警示
+    const staleWarn = (daysOld !== null && daysOld > 10)
+      ? `<span style="font-size:10px;color:var(--yellow);margin-left:4px;">⚠️ ${daysOld}天前</span>` : '';
+
+    // 插入不足分隔線
     const divider = (insufficient && meta.recent_count !== undefined && idx === meta.recent_count && idx > 0)
       ? `<div style="margin:8px 0;padding:6px 10px;background:rgba(245,158,11,.06);border-radius:6px;font-size:11px;color:var(--yellow);">近14日內新聞不足，以下補充較早資料，僅供參考。</div>`
       : '';
-    return divider + `<div class="news-item">
-      <a href="${a.url}" target="_blank" rel="noopener">${a.title}</a>
-      <div class="news-meta"><span class="news-source">${a.source}</span><span class="news-date">${pubStr}</span></div>
-      ${a.snippet ? `<div class="news-snippet">${a.snippet}</div>` : ''}
+
+    return divider + `<div class="news-item" style="${daysOld !== null && daysOld > 10 ? 'opacity:0.7;' : ''}">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap;">
+        ${toneTag}
+        <span class="news-source">${a.source}</span>
+        <span class="news-date">${pubStr}</span>${staleWarn}
+      </div>
+      <a href="${a.url}" target="_blank" rel="noopener" style="font-size:13px;font-weight:500;">${a.title}</a>
+      ${a.snippet ? `<div class="news-snippet" style="margin-top:4px;">${a.snippet}</div>` : ''}
     </div>`;
   }).join('');
-  return `<div class="news-card"><div class="res-card-title">最新新聞輿情（近14日，最新優先）</div><div class="news-list">${items}</div></div>`;
+
+  // 計算情緒統計
+  const posCount = classified.filter(a => a.tone === 'positive').length;
+  const negCount = classified.filter(a => a.tone === 'negative').length;
+  const freshCount = classified.filter(a => a.fresh).length;
+  const summaryBar = `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;font-size:11px;">
+    <span style="color:var(--green);">📈 正面 ${posCount}</span>
+    <span style="color:var(--red);">📉 負面 ${negCount}</span>
+    <span style="color:var(--text3);">➡️ 中性 ${classified.length - posCount - negCount}</span>
+    <span style="color:var(--text3);">｜近7日 ${freshCount} 篇</span>
+  </div>`;
+
+  return `<div class="news-card"><div class="res-card-title">最新新聞輿情（近14日，最新優先）</div>${summaryBar}<div class="news-list">${items}</div></div>`;
 }
 
 // ── Themes ────────────────────────────────────────────────────────
