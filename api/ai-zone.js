@@ -65,7 +65,7 @@ ${monthly_revenue ? `月營收年增率：${monthly_revenue.yoy}%  月增率：$
 ${chipStr ? `籌碼面（三大法人）：${chipStr}` : ""}
 ${analystStr ? `分析師共識：${analystStr}` : ""}
 ${market_context ? `\n【當前市場策略背景】\n${market_context.slice(0,500)}\n請在建議中參考以上市場環境與策略方向。` : ""}
-${strategy ? `\n【規則計算策略結果（已由程式算出，AI請以此為基礎解釋語氣，不要另外自創數字）】\n綜合總分：${strategy.totalScore ?? '資料不足'}／100\n操作狀態：${strategy.actionLabel}\n${strategy.overheated ? '⚠️ 強制降級：RSI過熱或乖離過大' : ''}\n請在 reason 中用1-2句自然語言解釋這個分數，在 strategy 中給出符合此分數的操作建議，不要改變已計算好的總分。` : ""}
+${(strategy && strategy.totalScore != null) ? "\n策略模組已計算總分：" + strategy.totalScore + "/100，狀態：" + strategy.action + (strategy.overheated ? "（已強制降級，RSI或乖離過大）" : "") + "。請依此分數決定 verdict 和 score，score 應接近此分數。" : ""}
 多方${signal?.bullScore}  空方${signal?.bearScore}  ${signal?.summary}
 
 只輸出以下 JSON，不要其他文字，所有字串值不含雙引號或換行符號：
