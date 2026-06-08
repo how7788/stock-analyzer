@@ -1885,20 +1885,32 @@ async function fetchAIZone(data, analyst) {
     updateSummaryWithAI(bz);
   } catch(e) {
     clearTimeout(timer);
-    const isTimeout = e.name === 'AbortError';
-    const fallback = generateFallbackSummary(data, strategy);
-    if (el) el.innerHTML = `
-      <div style="padding:14px 18px;">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-          <span style="font-size:10px;background:rgba(245,158,11,.1);color:var(--yellow);padding:2px 8px;border-radius:20px;font-weight:700;">${isTimeout ? 'TIMEOUT' : 'ERROR'}</span>
-          <span style="font-size:13px;font-weight:600;color:var(--text);">結論與操作建議</span>
-        </div>
-        <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">
-          ${isTimeout ? 'AI 分析逾時，已先顯示技術指標資料。你可以稍後重新分析。' : 'AI 分析暫時不可用，以下為技術指標摘要。'}
-        </div>
-        <div style="font-size:13px;color:var(--text);line-height:1.7;padding:10px 12px;background:var(--card2);border-radius:8px;margin-bottom:10px;">${fallback}</div>
-        <button onclick="reanalyzeAI()" style="background:var(--blue);border:none;border-radius:8px;padding:7px 16px;color:#fff;font-size:12px;font-weight:500;cursor:pointer;">↺ 重新分析</button>
+    // ai-zone 失敗時，改用輕量 AI 生成結論
+    if (el) el.innerHTML = `<div style="padding:14px 18px;"><div style="font-size:12px;color:var(--text3);">AI 分析載入中…</div></div>`;
+    try {
+      const r2 = await fetch('/api/mkt-ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'stock', stock_id: data.stock_id, name: data.name, market: data.market, price: data.price, indicators: data.indicators, valuation: data.valuation, strategy: strategy ? { totalScore: strategy.totalScore, action: strategy.action } : null }),
+      });
+      const j2 = await r2.json();
+      if (j2.summary && el) {
+        el.innerHTML = `<div style="padding:14px 18px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+            <span class="ai-badge">AI</span>
+            <span style="font-size:13px;font-weight:600;color:var(--text);">結論與操作建議</span>
+          </div>
+          <div style="font-size:13px;color:var(--text);line-height:1.8;margin-bottom:12px;">${j2.summary}</div>
+          ${strategy?.actionLabel ? '<div style="font-size:14px;font-weight:700;color:' + ({'can_accumulate':'var(--green)','watch_wait':'var(--yellow)','do_not_chase':'var(--orange)','high_risk':'var(--red)'}[strategy.action]||'var(--text)') + ';margin-bottom:8px;">' + strategy.actionLabel + (strategy.totalScore != null ? '　' + strategy.totalScore + '/100' : '') + '</div>' : ''}
+          <button onclick="reanalyzeAI()" style="background:var(--blue);border:none;border-radius:8px;padding:7px 16px;color:#fff;font-size:12px;font-weight:500;cursor:pointer;margin-top:4px;">↺ 完整分析</button>
+        </div>`;
+      }
+    } catch(_) {
+      if (el) el.innerHTML = `<div style="padding:14px 18px;">
+        <div style="font-size:13px;color:var(--text);line-height:1.7;">${generateFallbackSummary(data, strategy)}</div>
+        <button onclick="reanalyzeAI()" style="background:var(--blue);border:none;border-radius:8px;padding:7px 16px;color:#fff;font-size:12px;font-weight:500;cursor:pointer;margin-top:10px;">↺ 重新分析</button>
       </div>`;
+    }
     // fetchStockSummary 已獨立處理綜合總結，此處不需重複
   }
 }
