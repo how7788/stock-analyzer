@@ -1901,7 +1901,7 @@ async function fetchAIZone(data, analyst) {
             <span style="font-size:13px;font-weight:600;color:var(--text);">結論與操作建議</span>
           </div>
           <div style="font-size:13px;color:var(--text);line-height:1.8;margin-bottom:12px;">${j2.summary}</div>
-          ${strategy?.actionLabel ? '<div style="font-size:14px;font-weight:700;color:' + ({'can_accumulate':'var(--green)','watch_wait':'var(--yellow)','do_not_chase':'var(--orange)','high_risk':'var(--red)'}[strategy.action]||'var(--text)') + ';margin-bottom:8px;">' + strategy.actionLabel + (strategy.totalScore != null ? '　' + strategy.totalScore + '/100' : '') + '</div>' : ''}
+
           <button onclick="reanalyzeAI()" style="background:var(--blue);border:none;border-radius:8px;padding:7px 16px;color:#fff;font-size:12px;font-weight:500;cursor:pointer;margin-top:4px;">↺ 完整分析</button>
         </div>`;
       }
