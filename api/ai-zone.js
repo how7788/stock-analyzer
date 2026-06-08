@@ -11,7 +11,7 @@ module.exports = async function handler(req, res) {
   let body = req.body;
   if (typeof body === "string") { try { body = JSON.parse(body); } catch (_) {} }
 
-  const { stock_id, name, market, currency, price, indicators, signal, valuation, monthly_revenue, institutional, analyst, market_context } = body || {};
+  const { stock_id, name, market, currency, price, indicators, signal, valuation, monthly_revenue, institutional, analyst, market_context, strategy } = body || {};
   if (!stock_id) return res.status(400).json({ error: "缺少 stock_id" });
 
   const isUS = market === "us";
@@ -65,6 +65,7 @@ ${monthly_revenue ? `月營收年增率：${monthly_revenue.yoy}%  月增率：$
 ${chipStr ? `籌碼面（三大法人）：${chipStr}` : ""}
 ${analystStr ? `分析師共識：${analystStr}` : ""}
 ${market_context ? `\n【當前市場策略背景】\n${market_context.slice(0,500)}\n請在建議中參考以上市場環境與策略方向。` : ""}
+${strategy ? `\n【規則計算策略結果（已由程式算出，AI請以此為基礎解釋語氣，不要另外自創數字）】\n綜合總分：${strategy.totalScore ?? '資料不足'}／100\n操作狀態：${strategy.actionLabel}\n${strategy.overheated ? '⚠️ 強制降級：RSI過熱或乖離過大' : ''}\n請在 reason 中用1-2句自然語言解釋這個分數，在 strategy 中給出符合此分數的操作建議，不要改變已計算好的總分。` : ""}
 多方${signal?.bullScore}  空方${signal?.bearScore}  ${signal?.summary}
 
 只輸出以下 JSON，不要其他文字，所有字串值不含雙引號或換行符號：
