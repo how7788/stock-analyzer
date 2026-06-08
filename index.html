@@ -1722,15 +1722,50 @@ function updateSummaryWithAI(bz) {
   el.style.color = { buy: 'var(--green)', watch: 'var(--yellow)', avoid: 'var(--red)' }[bz.verdict] || 'var(--text)';
 }
 
-function generateFallbackSummary(data) {
-  const ind = data.indicators || {}, sig = data.signal || {};
-  const lines = [];
-  if (ind.ma20 && ind.ma60) lines.push(ind.ma20 > ind.ma60 ? '月線站上季線，短中期偏多排列。' : '月線跌破季線，短中期偏空排列。');
-  if (ind.rsi != null) lines.push(ind.rsi < 40 ? `RSI ${ind.rsi} 低檔，超賣區有反彈空間。` : ind.rsi > 70 ? `RSI ${ind.rsi} 高檔，短線注意壓力。` : `RSI ${ind.rsi} 中性區間。`);
-  if (ind.macd_hist != null) lines.push(ind.macd_hist > 0 ? 'MACD 柱狀為正，動能偏多。' : 'MACD 柱狀為負，動能偏空。');
-  if (ind.month_k != null) lines.push(ind.month_k < 25 ? `月KD K值 ${ind.month_k}，長線低檔。` : ind.month_k > 75 ? `月KD K值 ${ind.month_k}，長線高檔留意。` : '');
-  if (sig.summary) lines.push(sig.summary);
-  return lines.filter(Boolean).join(' ') || '技術指標資料已載入，請參考均線與動能指標。';
+function generateFallbackSummary(data, strategy) {
+  const ind = data.indicators || {}, val = data.valuation, rev = data.monthly_revenue;
+  const price = data.price?.close;
+  const parts = [];
+
+  // ── 用策略分數生成結論（若有）──
+  if (strategy && strategy.totalScore != null) {
+    const scoreDesc = strategy.totalScore >= 75 ? '整體偏多' : strategy.totalScore >= 55 ? '中性偏多，建議觀察' : strategy.totalScore >= 40 ? '中性偏弱，不急進場' : '風險偏高，建議觀望';
+    parts.push(`<strong>策略評分：${strategy.totalScore}/100（${scoreDesc}）</strong>`);
+
+    // 各策略重點
+    const details = [];
+    for (const s of strategy.strategies || []) {
+      if (s.score == null) continue;
+      const icon = s.score >= 75 ? '✅' : s.score >= 55 ? '🟡' : '⚠️';
+      details.push(`${icon} ${s.name} ${s.score}/100`);
+    }
+    if (details.length) parts.push(details.join('　'));
+
+    // 分批觀察
+    if (strategy.batches?.length) {
+      const batchText = strategy.batches.map(b => `${b.label}：${b.range}`).join('　');
+      parts.push(`<strong>分批觀察：</strong>${batchText}`);
+    }
+
+    // 停損
+    if (strategy.stopLoss?.length) {
+      parts.push(`<strong>停損參考：</strong>${strategy.stopLoss[0]}`);
+    }
+
+    // 主要風險（排除免責聲明那條）
+    const risks = (strategy.risks || []).filter(r => !r.includes('僅供研究'));
+    if (risks.length) parts.push(`<strong>主要風險：</strong>${risks.join('　')}`);
+  } else {
+    // 無策略分數時，退回技術面摘要
+    const lines = [];
+    if (ind.ma20 && ind.ma60) lines.push(ind.ma20 > ind.ma60 ? '月線站上季線，短中期偏多。' : '月線跌破季線，短中期偏空。');
+    if (isNum(ind.rsi)) lines.push(ind.rsi < 40 ? `RSI ${ind.rsi} 超賣，有反彈空間。` : ind.rsi > 70 ? `RSI ${ind.rsi} 高檔，短線留意。` : `RSI ${ind.rsi} 中性區間。`);
+    if (isNum(ind.macd_hist)) lines.push(ind.macd_hist > 0 ? 'MACD 動能偏多。' : 'MACD 動能偏空。');
+    parts.push(lines.filter(Boolean).join(' '));
+  }
+
+  parts.push('<span style="font-size:11px;color:var(--text3);">⚠️ 以上為規則計算結果，AI 分析暫時不可用，僅供研究參考，不構成投資建議。</span>');
+  return parts.filter(Boolean).join('<br>');
 }
 
 async function fetchAIZone(data, analyst) {
@@ -1761,7 +1796,7 @@ async function fetchAIZone(data, analyst) {
   } catch(e) {
     clearTimeout(timer);
     const isTimeout = e.name === 'AbortError';
-    const fallback = generateFallbackSummary(data);
+    const fallback = generateFallbackSummary(data, strategy);
     if (el) el.innerHTML = `
       <div style="padding:14px 18px;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
