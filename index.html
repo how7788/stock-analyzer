@@ -1642,7 +1642,7 @@ function calculateStrategy(data, articles) {
   if (s5.score !== null && s5.score < 40) risks.push('近期新聞日期偏舊，缺乏新鮮催化');
   risks.push('以上分析僅供研究參考，不構成投資建議');
 
-  return { totalScore, action, actionLabel, actionColor, overheated, strategies: [s1, s2, s3, s4, s5, s6], batches, stopLoss, risks };
+  return { totalScore, action, actionLabel, actionColor, overheated, strategies: [s1, s2, s3, s4], batches, stopLoss, risks };
 }
 
 async function fetchAnalystData(data) {
@@ -1741,9 +1741,37 @@ function generateDataSummary(d) {
 function updateSummaryWithAI(bz) {
   const el = document.getElementById('summary-ai-line');
   if (!el || !bz) return;
+  const verdictColor = { buy: 'var(--green)', watch: 'var(--yellow)', avoid: 'var(--red)' }[bz.verdict] || 'var(--text)';
   const verdictLabel = { buy: '✅ 可布局', watch: '🟡 觀察等待', avoid: '🔴 建議避開' }[bz.verdict] || '';
-  el.innerHTML = `<strong>${verdictLabel}（AI 評分 ${bz.score}/100）</strong>　${bz.strategy || ''}${bz.wait_for ? '　⏳ ' + bz.wait_for : ''}`;
-  el.style.color = { buy: 'var(--green)', watch: 'var(--yellow)', avoid: 'var(--red)' }[bz.verdict] || 'var(--text)';
+  const riskColor = { low: 'var(--green)', medium: 'var(--yellow)', high: 'var(--red)' }[bz.risk] || 'var(--text3)';
+  const riskLabel = { low: '低風險', medium: '中等風險', high: '高風險' }[bz.risk] || '';
+
+  // 風險清單
+  const bearItems = (bz.checklist || []).filter(c => c.status === 'fail').map(c => c.note).filter(Boolean).slice(0,3);
+  const bullItems = (bz.checklist || []).filter(c => c.status === 'pass').map(c => c.note).filter(Boolean).slice(0,3);
+
+  el.innerHTML =
+    '<div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">' +
+    // 狀態列
+    '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">' +
+    '<div style="font-size:18px;font-weight:700;color:' + verdictColor + ';">' + verdictLabel + '</div>' +
+    '<div style="display:flex;gap:10px;align-items:center;">' +
+    '<span style="font-size:13px;font-family:'JetBrains Mono',monospace;font-weight:700;">' + (bz.score || '—') + ' / 100</span>' +
+    (riskLabel ? '<span style="font-size:11px;padding:2px 8px;border-radius:20px;background:var(--card2);color:' + riskColor + ';">' + riskLabel + '</span>' : '') +
+    '</div>' +
+    '</div>' +
+    // AI 理由
+    (bz.reason ? '<div style="font-size:13px;color:var(--text);line-height:1.7;margin-bottom:8px;">' + bz.reason + '</div>' : '') +
+    // 操作策略
+    (bz.strategy ? '<div style="font-size:12px;color:var(--text2);background:var(--card2);padding:8px 12px;border-radius:8px;margin-bottom:8px;">📌 ' + bz.strategy + '</div>' : '') +
+    // 等待條件
+    (bz.wait_for ? '<div style="font-size:12px;color:var(--yellow);margin-bottom:8px;">⏳ ' + bz.wait_for + '</div>' : '') +
+    // 多空要點
+    (bullItems.length || bearItems.length ? '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+      bullItems.map(t => '<span style="font-size:11px;color:var(--green);">✦ ' + t + '</span>').join('') +
+      bearItems.map(t => '<span style="font-size:11px;color:var(--red);">⚠ ' + t + '</span>').join('') +
+    '</div>' : '') +
+    '</div>';
 }
 
 function generateFallbackSummary(data, strategy) {
@@ -2217,62 +2245,27 @@ function renderBuyZoneHTML(bz, cur) {
 function renderNewsHTML(articles, meta) {
   if (!articles || !articles.length) return `<div class="news-card"><div class="res-card-title">最新新聞輿情</div><div class="news-empty">近14日暫無高相關新聞</div></div>`;
   const insufficient = meta && meta.insufficient;
-  // Phase 2: 情緒分類
-  const { classified } = classifyNews(articles);
-
-  const items = classified.map((a, idx) => {
+  const items = articles.map((a, idx) => {
     let pubStr = '日期未知';
-    let daysOld = a.days ?? null;
-    if (a.published && daysOld === null) {
+    let daysOld = null;
+    if (a.published) {
       try {
         const d = new Date(a.published); if (!isNaN(d)) {
           daysOld = Math.floor((new Date() - d) / 86400000);
+          pubStr = daysOld === 0 ? '今天' : daysOld === 1 ? '昨天' : daysOld < 7 ? daysOld + '天前' : d.toLocaleDateString('zh-TW', { month: '2-digit', day: '2-digit' });
         }
       } catch (_) {}
     }
-    if (daysOld !== null) {
-      pubStr = daysOld === 0 ? '今天' : daysOld === 1 ? '昨天' : daysOld < 7 ? daysOld + '天前' : new Date(a.published).toLocaleDateString('zh-TW', { month: '2-digit', day: '2-digit' });
-    }
-
-    // 情緒標籤
-    const toneTag = a.tone === 'positive'
-      ? `<span style="font-size:10px;padding:1px 6px;border-radius:20px;background:rgba(16,185,129,.1);color:var(--green);font-weight:600;">📈 正面</span>`
-      : a.tone === 'negative'
-      ? `<span style="font-size:10px;padding:1px 6px;border-radius:20px;background:rgba(239,68,68,.08);color:var(--red);font-weight:600;">📉 負面</span>`
-      : `<span style="font-size:10px;padding:1px 6px;border-radius:20px;background:var(--card2);color:var(--text3);">➡️ 中性</span>`;
-
-    // 過舊警示
-    const staleWarn = (daysOld !== null && daysOld > 10)
-      ? `<span style="font-size:10px;color:var(--yellow);margin-left:4px;">⚠️ ${daysOld}天前</span>` : '';
-
-    // 插入不足分隔線
     const divider = (insufficient && meta.recent_count !== undefined && idx === meta.recent_count && idx > 0)
       ? `<div style="margin:8px 0;padding:6px 10px;background:rgba(245,158,11,.06);border-radius:6px;font-size:11px;color:var(--yellow);">近14日內新聞不足，以下補充較早資料，僅供參考。</div>`
       : '';
-
-    return divider + `<div class="news-item" style="${daysOld !== null && daysOld > 10 ? 'opacity:0.7;' : ''}">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap;">
-        ${toneTag}
-        <span class="news-source">${a.source}</span>
-        <span class="news-date">${pubStr}</span>${staleWarn}
-      </div>
-      <a href="${a.url}" target="_blank" rel="noopener" style="font-size:13px;font-weight:500;">${a.title}</a>
-      ${a.snippet ? `<div class="news-snippet" style="margin-top:4px;">${a.snippet}</div>` : ''}
+    return divider + `<div class="news-item">
+      <a href="${a.url}" target="_blank" rel="noopener">${a.title}</a>
+      <div class="news-meta"><span class="news-source">${a.source}</span><span class="news-date">${pubStr}</span></div>
+      ${a.snippet ? `<div class="news-snippet">${a.snippet}</div>` : ''}
     </div>`;
   }).join('');
-
-  // 計算情緒統計
-  const posCount = classified.filter(a => a.tone === 'positive').length;
-  const negCount = classified.filter(a => a.tone === 'negative').length;
-  const freshCount = classified.filter(a => a.fresh).length;
-  const summaryBar = `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;font-size:11px;">
-    <span style="color:var(--green);">📈 正面 ${posCount}</span>
-    <span style="color:var(--red);">📉 負面 ${negCount}</span>
-    <span style="color:var(--text3);">➡️ 中性 ${classified.length - posCount - negCount}</span>
-    <span style="color:var(--text3);">｜近7日 ${freshCount} 篇</span>
-  </div>`;
-
-  return `<div class="news-card"><div class="res-card-title">最新新聞輿情（近14日，最新優先）</div>${summaryBar}<div class="news-list">${items}</div></div>`;
+  return `<div class="news-card"><div class="res-card-title">最新新聞輿情（近14日，最新優先）</div><div class="news-list">${items}</div></div>`;
 }
 
 // ── Themes ────────────────────────────────────────────────────────
