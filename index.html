@@ -814,21 +814,19 @@ function renderStrategySection(strategy) {
 
   // 策略符合度列表
   const strRows = strategies.map(s => {
-    const icon = s.score == null ? '⚫' : s.score >= 75 ? '🟢' : s.score >= 55 ? '🟡' : '🔴';
-    const scoreDisp = s.score != null ? `${s.score}/100` : '資料不足';
-    const okDetails = (s.ok || []).slice(0, 2).map(t => `<span style="color:var(--green);font-size:10px;">✓ ${t}</span>`).join(' ');
-    const failDetails = (s.fail || []).slice(0, 2).map(t => `<span style="color:var(--red);font-size:10px;">✗ ${t}</span>`).join(' ');
-    // News: show pos/neg count if available
-    const newsExtra = s.classified ? ` <span style="font-size:10px;color:var(--green)">↑${s.classified.filter(a=>a.tone==='positive').length}</span><span style="font-size:10px;color:var(--red)"> ↓${s.classified.filter(a=>a.tone==='negative').length}</span>` : '';
-    return `<div style="display:flex;align-items:flex-start;gap:6px;padding:6px 0;border-bottom:1px solid var(--border);">
-      <span style="flex:0 0 auto;font-size:13px;margin-top:1px;">${icon}</span>
-      <div style="flex:1;min-width:0;">
-        <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
-          <span style="font-size:12px;font-weight:600;">${s.name}</span>
-          <span style="font-size:11px;color:var(--text3);">${scoreDisp}${newsExtra}</span>
-        </div>
-        ${okDetails || failDetails ? `<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:4px;">${okDetails}${failDetails}</div>` : ''}
+    const scoreDisp = s.score != null ? s.score : '—';
+    const barW = s.score != null ? s.score : 0;
+    const barColor = s.score == null ? 'var(--border)' : s.score >= 68 ? 'var(--green)' : s.score >= 50 ? 'var(--yellow)' : 'var(--red)';
+    const topDetail = [...(s.ok||[]).slice(0,1), ...(s.fail||[]).slice(0,1)].join('　');
+    return `<div style="padding:8px 0;border-bottom:1px solid var(--border);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <span style="font-size:12px;font-weight:600;color:var(--text);">${s.name}</span>
+        <span style="font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;color:${barColor};">${scoreDisp}</span>
       </div>
+      <div style="height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:4px;">
+        <div style="height:100%;width:${barW}%;background:${barColor};border-radius:2px;transition:width .4s;"></div>
+      </div>
+      ${topDetail ? `<div style="font-size:11px;color:var(--text3);">${topDetail}</div>` : ''}
     </div>`;
   }).join('');
 
