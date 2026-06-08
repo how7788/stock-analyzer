@@ -782,6 +782,30 @@ async function fetchMktAI(d, area) {
   }
 }
 
+// ── P/E Percentile Bar Renderer ─────────────────────────────────
+function renderPEBar(val) {
+  if (!val) return '';
+  const { per, per_min_1y, per_max_1y, per_avg_1y } = val;
+  if (per == null || per_min_1y == null || per_max_1y == null) return '<span style="color:var(--text3)">—</span>';
+  const range = per_max_1y - per_min_1y;
+  const pct = range > 0 ? Math.round((per - per_min_1y) / range * 100) : 50;
+  const barColor = pct >= 80 ? 'var(--red)' : pct <= 20 ? 'var(--green)' : 'var(--yellow)';
+  const label = pct >= 80 ? '估值偏高' : pct <= 20 ? '估值偏低' : '估值中段';
+  const avgPct = (per_avg_1y != null && range > 0) ? Math.round((per_avg_1y - per_min_1y) / range * 100) : null;
+  return '<div style="margin-top:4px;">' +
+    '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:3px;">' +
+    '<span>低 ' + per_min_1y + 'x</span>' +
+    '<span style="color:' + barColor + ';font-weight:600;">現在 ' + per + 'x (' + pct + '%) ' + label + '</span>' +
+    '<span>高 ' + per_max_1y + 'x</span>' +
+    '</div>' +
+    '<div style="height:6px;background:var(--border);border-radius:4px;position:relative;overflow:hidden;">' +
+    '<div style="position:absolute;left:0;top:0;height:100%;width:' + pct + '%;background:' + barColor + ';border-radius:4px;"></div>' +
+    (avgPct != null ? '<div style="position:absolute;top:0;height:100%;width:2px;background:var(--text2);left:' + avgPct + '%;"></div>' : '') +
+    '</div>' +
+    (per_avg_1y ? '<div style="font-size:10px;color:var(--text3);margin-top:2px;">均值 ' + per_avg_1y + 'x（白線）</div>' : '') +
+    '</div>';
+}
+
 // ── Strategy UI Renderer ──────────────────────────────────────
 function renderStrategySection(strategy) {
   if (!strategy) return '';
@@ -1965,26 +1989,7 @@ function renderResult(d) {
         </div>
         <div class="ind-item" style="grid-column:span 3;">
           <label>一年估值位置</label>
-          ${(() => {
-            const { per, per_min_1y, per_max_1y, per_avg_1y } = d.valuation;
-            if (per == null || per_min_1y == null || per_max_1y == null) return '<span style="color:var(--text3)">—</span>';
-            const range = per_max_1y - per_min_1y;
-            const pct = range > 0 ? Math.round((per - per_min_1y) / range * 100) : 50;
-            const barColor = pct >= 80 ? 'var(--red)' : pct <= 20 ? 'var(--green)' : 'var(--yellow)';
-            const label = pct >= 80 ? '估值偏高' : pct <= 20 ? '估值偏低' : '估值中段';
-            return \`<div style="margin-top:4px;">
-              <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:3px;">
-                <span>低 \${per_min_1y}x</span>
-                <span style="color:\${barColor};font-weight:600;">現在 \${per}x (\${pct}%) \${label}</span>
-                <span>高 \${per_max_1y}x</span>
-              </div>
-              <div style="height:6px;background:var(--border);border-radius:4px;position:relative;overflow:hidden;">
-                <div style="position:absolute;left:0;top:0;height:100%;width:\${pct}%;background:\${barColor};border-radius:4px;transition:width .4s;"></div>
-                \${per_avg_1y ? \`<div style="position:absolute;top:0;height:100%;width:2px;background:var(--text2);left:\${range > 0 ? Math.round((per_avg_1y - per_min_1y)/range*100) : 50}%;"></div>\` : ''}
-              </div>
-              \${per_avg_1y ? \`<div style="font-size:10px;color:var(--text3);margin-top:2px;">均值 \${per_avg_1y}x（白線）</div>\` : ''}
-            </div>\`;
-          })()}
+          <div>${renderPEBar(d.valuation)}</div>
         </div>
         <div class="ind-item"><label>P/B 淨值比</label><span>${d.valuation.pbr != null ? d.valuation.pbr + 'x' : '—'}</span></div>
         <div class="ind-item"><label>現金殖利率</label><span style="color:var(--green)">${d.valuation.yield != null ? d.valuation.yield + '%' : '—'}</span></div>
