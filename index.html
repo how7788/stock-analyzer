@@ -819,7 +819,7 @@ function renderStrategySection(strategy) {
   // 風險
   const riskRows = risks.map(r => `<div style="font-size:11px;color:var(--text3);padding:1px 0;">• ${r}</div>`).join('');
 
-  return `<div class="res-card" style="border-left:3px solid ${actionColor};">
+  return `<div class="res-card" id="strategy-result-section" style="border-left:3px solid ${actionColor};">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
       <div>
         <div style="font-size:11px;color:var(--text3);letter-spacing:.5px;margin-bottom:4px;">📊 策略符合度分析</div>
@@ -1661,6 +1661,14 @@ async function fetchNews(data) {
     if (!res.ok) throw new Error(json.error || '新聞載入失敗');
     _lastNewsArticles = json.articles || [];
     el.outerHTML = renderNewsHTML(_lastNewsArticles, json);
+    // 新聞載完後重算新聞催化分數並更新策略區塊
+    if (_lastAIData) {
+      try {
+        const strat = calculateStrategy(_lastAIData, _lastNewsArticles);
+        const sEl = document.getElementById('strategy-result-section');
+        if (sEl) sEl.outerHTML = renderStrategySection(strat);
+      } catch(_) {}
+    }
   } catch(e) {
     if (el) el.innerHTML = `<div class="news-empty">新聞暫時無法載入：${e.message}</div>`;
   }
