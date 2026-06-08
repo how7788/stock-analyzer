@@ -23,13 +23,10 @@ function getSource(url) {
 // daysParam: 1 = 今日（近24h），2 = 昨日（近48h）
 async function fetchNews(tavilyKey, daysParam) {
   const queries = [
-    "台股 大盤 指數 今日 重要消息 漲跌",
-    "台指期貨 夜盤 熔斷 大跌 大漲 最新",
-    "台股 AI伺服器 半導體 強勢族群 產業焦點",
+    "台股 大盤 指數 期貨 今日 重要消息 最新",
+    "台股 AI半導體 強勢族群 產業焦點 法人",
     "台積電 聯發科 鴻海 廣達 最新消息",
-    "台股 資金輪動 題材 法人買賣 重點",
-    "美國科技股 AI 半導體 聯準會 最新消息 中文",
-    "聯準會 利率 美債殖利率 通膨 美元指數 中文",
+    "美股 聯準會 利率 半導體 台股影響 中文",
   ];
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 9000);
