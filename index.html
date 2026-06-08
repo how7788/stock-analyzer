@@ -782,6 +782,71 @@ async function fetchMktAI(d, area) {
   }
 }
 
+// ── Strategy UI Renderer ──────────────────────────────────────
+function renderStrategySection(strategy) {
+  if (!strategy) return '';
+  const { totalScore, action, actionLabel, actionColor, overheated, strategies, batches, stopLoss, risks } = strategy;
+
+  const scoreStr = totalScore != null ? `${totalScore} / 100` : '資料不足';
+
+  // 策略符合度列表
+  const strRows = strategies.map(s => {
+    const icon = s.score == null ? '⚫' : s.score >= 75 ? '🟢' : s.score >= 55 ? '🟡' : '🔴';
+    const scoreDisp = s.score != null ? `${s.score}/100` : '資料不足';
+    const details = [...(s.ok || []), ...(s.fail || [])].slice(0, 2).join('　');
+    return `<div style="display:flex;align-items:flex-start;gap:6px;padding:5px 0;border-bottom:1px solid var(--border);">
+      <span style="flex:0 0 auto;font-size:12px;">${icon}</span>
+      <div style="flex:1;min-width:0;">
+        <span style="font-size:12px;font-weight:600;">${s.name}</span>
+        <span style="font-size:11px;color:var(--text3);margin-left:6px;">${scoreDisp}</span>
+        ${details ? `<div style="font-size:11px;color:var(--text2);margin-top:2px;">${details}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  // 分批計畫
+  const batchRows = batches.slice(0,3).map((b, i) =>
+    `<div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;flex:1;min-width:120px;">
+      <div style="font-size:10px;color:var(--text3);margin-bottom:3px;">${b.label}</div>
+      <div style="font-size:12px;font-family:'JetBrains Mono',monospace;font-weight:600;">${b.range}</div>
+      <div style="font-size:10px;color:var(--text2);margin-top:2px;">${b.reason}</div>
+    </div>`
+  ).join('');
+
+  // 停損
+  const slRows = stopLoss.map(r => `<div style="font-size:12px;color:var(--text2);padding:3px 0;">⚠️ ${r}</div>`).join('');
+
+  // 風險
+  const riskRows = risks.map(r => `<div style="font-size:11px;color:var(--text3);padding:1px 0;">• ${r}</div>`).join('');
+
+  return `<div class="res-card" style="border-left:3px solid ${actionColor};">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+      <div>
+        <div style="font-size:11px;color:var(--text3);letter-spacing:.5px;margin-bottom:4px;">📊 策略符合度分析</div>
+        <div style="font-size:20px;font-weight:700;color:${actionColor};">${actionLabel}</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:11px;color:var(--text3);">綜合總分</div>
+        <div style="font-size:24px;font-weight:700;font-family:'JetBrains Mono',monospace;">${scoreStr}</div>
+      </div>
+    </div>
+    ${overheated ? `<div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--yellow);margin-bottom:10px;">⚠️ RSI 偏高或乖離過大，強制判定「偏高不追」</div>` : ''}
+    <div style="margin-bottom:12px;">${strRows}</div>
+    ${batches.length ? `<div style="margin-top:12px;">
+      <div style="font-size:11px;color:var(--text3);letter-spacing:.5px;margin-bottom:8px;">分批觀察計畫</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">${batchRows}</div>
+    </div>` : ''}
+    ${stopLoss.length ? `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+      <div style="font-size:11px;color:var(--text3);letter-spacing:.5px;margin-bottom:6px;">停損參考</div>
+      ${slRows}
+    </div>` : ''}
+    ${risks.length ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+      <div style="font-size:11px;color:var(--text3);letter-spacing:.5px;margin-bottom:4px;">主要風險</div>
+      ${riskRows}
+    </div>` : ''}
+  </div>`;
+}
+
 function generateMktFallback(d) {
   const ind = d.indicators, p = d.price;
   const lines = [];
@@ -1188,6 +1253,233 @@ async function analyze() {
 
 let _lastAIData = null;
 let _lastAnalyst = null;
+let _lastNewsArticles = [];
+
+// ════════════════════════════════════════════════════════════
+// 可解釋交易策略模組 Phase 1
+// 規則先算分數，AI 只負責解釋語氣
+// ════════════════════════════════════════════════════════════
+
+const isNum = v => typeof v === 'number' && Number.isFinite(v);
+const safeN = (v, fb = '—') => isNum(v) ? v : fb;
+const safePct = (v, d = 2) => isNum(v) ? (v > 0 ? '+' : '') + v.toFixed(d) + '%' : '資料不足';
+const safeP  = (v, d = 0) => isNum(v) ? v.toLocaleString('zh-TW', {maximumFractionDigits: d}) : '資料不足';
+
+function weightedAvg(scores) {
+  const valid = scores.filter(s => isNum(s.score));
+  if (!valid.length) return null;
+  const tw = valid.reduce((s, x) => s + x.w, 0);
+  return Math.round(valid.reduce((s, x) => s + x.score * x.w, 0) / tw);
+}
+
+// ── Strategy 1: 均線多頭排列 ──────────────────────────────────
+function calcMAAlignStrategy(price, ind) {
+  let pts = 0, max = 0;
+  const ok = [], fail = [];
+  const add = (cond, label, badLabel, p) => {
+    max += p;
+    if (cond) { pts += p; ok.push(label); } else fail.push(badLabel);
+  };
+  if (isNum(price) && isNum(ind.ma20))  add(price > ind.ma20, `現價 ${safeP(price)} 站上月線(${safeP(ind.ma20)})`, `現價跌破月線(${safeP(ind.ma20)})`, 15);
+  if (isNum(ind.ma20) && isNum(ind.ma60))  add(ind.ma20 > ind.ma60,  `月線站上季線`, `月線跌破季線`, 20);
+  if (isNum(ind.ma60) && isNum(ind.ma120)) add(ind.ma60 > ind.ma120,  `季線站上半年線`, `季線跌破半年線`, 20);
+  if (isNum(ind.ma120) && isNum(ind.ma240)) add(ind.ma120 > ind.ma240, `半年線站上年線`, `半年線跌破年線`, 20);
+  if (isNum(ind.ma20) && isNum(ind.ma60) && isNum(ind.ma120) && isNum(ind.ma240) &&
+      ind.ma20 > ind.ma60 && ind.ma60 > ind.ma120 && ind.ma120 > ind.ma240)
+    { pts += 25; ok.push('完整四線多頭排列'); max += 25; }
+  else if (max > 0 && isNum(ind.ma20) && isNum(ind.ma60) && isNum(ind.ma120) && isNum(ind.ma240))
+    max += 25;
+
+  if (max === 0) return { score: null, status: 'insufficient_data', ok, fail, name: '均線多頭排列' };
+  const score = Math.round(pts / max * 100);
+  const status = score >= 80 ? 'bullish' : score >= 60 ? 'bullish' : score >= 40 ? 'neutral' : 'bearish';
+  return { score, status, ok, fail, name: '均線多頭排列' };
+}
+
+// ── Strategy 2: 均線回檔承接 ─────────────────────────────────
+function calcMAPullbackStrategy(price, ind) {
+  if (!isNum(price) || !isNum(ind.ma20)) return { score: null, status: 'insufficient_data', ok: [], fail: [], name: '均線回檔承接', zones: [] };
+  const biasMA20 = (price - ind.ma20) / ind.ma20 * 100;
+  const ok = [], fail = [], warn = [];
+  let score = 50;
+
+  if (isNum(ind.ma60) && isNum(ind.ma120) && isNum(ind.ma240) && ind.ma60 > ind.ma120 && ind.ma120 > ind.ma240)
+    { score += 20; ok.push('中長期多頭結構完整'); }
+  if (biasMA20 <= 5)  { score += 20; ok.push(`月線乖離僅 ${biasMA20.toFixed(1)}%，回檔幅度適中`); }
+  else if (biasMA20 <= 10) { ok.push(`月線乖離 ${biasMA20.toFixed(1)}%，偏高但尚可`); }
+  else { score -= 20; warn.push(`月線乖離 ${biasMA20.toFixed(1)}%，短線過熱不宜追高`); }
+  if (isNum(ind.rsi) && ind.rsi > 75) { score -= 20; warn.push(`RSI ${ind.rsi} 偏高，不宜追高`); }
+
+  const zones = [];
+  if (isNum(ind.ma20))  zones.push({ label: '積極觀察', price: ind.ma20, range: [+(ind.ma20*0.97).toFixed(0), +(ind.ma20*1.03).toFixed(0)], ma: 'MA20' });
+  if (isNum(ind.ma60))  zones.push({ label: '穩健觀察', price: ind.ma60, range: [+(ind.ma60*0.97).toFixed(0), +(ind.ma60*1.03).toFixed(0)], ma: 'MA60' });
+  if (isNum(ind.ma120)) zones.push({ label: '保守觀察', price: ind.ma120, range: [+(ind.ma120*0.97).toFixed(0), +(ind.ma120*1.03).toFixed(0)], ma: 'MA120' });
+
+  score = Math.min(100, Math.max(0, score));
+  const status = score >= 70 ? 'bullish' : score >= 50 ? 'neutral' : 'bearish';
+  return { score, status, ok, fail: warn, name: '均線回檔承接', zones };
+}
+
+// ── Strategy 3: RSI / MACD 動能 ──────────────────────────────
+function calcMomentumStrategy(price, ind) {
+  let pts = 0, max = 0;
+  const ok = [], fail = [], warn = [];
+  const hasRsi = isNum(ind.rsi);
+  const hasMacd = isNum(ind.macd_hist);
+
+  if (hasRsi) {
+    max += 40;
+    if (ind.rsi < 30)      { pts += 35; ok.push(`RSI ${ind.rsi} 超跌，潛在反彈`); }
+    else if (ind.rsi < 45) { pts += 25; ok.push(`RSI ${ind.rsi} 偏弱，觀察止跌`); }
+    else if (ind.rsi <= 70) { pts += 35; ok.push(`RSI ${ind.rsi} 中性偏強`); }
+    else if (ind.rsi <= 80) { pts += 15; warn.push(`RSI ${ind.rsi} 偏高，注意回檔`); }
+    else { pts += 0; warn.push(`RSI ${ind.rsi} 嚴重過熱，強制警示`); }
+  }
+  if (hasMacd) {
+    max += 40;
+    if (ind.macd_hist > 0) { pts += 35; ok.push(`MACD 柱狀為正(${ind.macd_hist.toFixed(2)})，動能偏多`); }
+    else { pts += 10; fail.push(`MACD 柱狀為負(${ind.macd_hist.toFixed(2)})，動能轉弱`); }
+  }
+  if (isNum(ind.month_k)) {
+    max += 20;
+    if (ind.month_k < 25)      { pts += 18; ok.push(`月KD K值 ${ind.month_k} 低檔`); }
+    else if (ind.month_k <= 75) { pts += 14; ok.push(`月KD K值 ${ind.month_k} 中性`); }
+    else { pts += 5; warn.push(`月KD K值 ${ind.month_k} 高檔，中長線留意`); }
+  }
+  if (max === 0) return { score: null, status: 'insufficient_data', ok, fail, warn, name: 'RSI/MACD 動能' };
+  const score = Math.round(pts / max * 100);
+  const status = score >= 70 ? 'bullish' : score >= 50 ? 'neutral' : 'bearish';
+  return { score, status, ok, fail: [...fail, ...warn], name: 'RSI/MACD 動能' };
+}
+
+// ── Strategy 4: 估值均值回歸 ─────────────────────────────────
+function calcValuationStrategy(price, ind, val) {
+  if (!val || (!isNum(val.per) && !isNum(val.yield))) return { score: null, status: 'insufficient_data', ok: [], fail: [], name: '估值合理性' };
+  let pts = 0, max = 0;
+  const ok = [], fail = [], warn = [];
+
+  if (isNum(val.per) && isNum(val.per_avg_1y)) {
+    max += 40;
+    const diff = (val.per - val.per_avg_1y) / val.per_avg_1y * 100;
+    if (diff < -10)       { pts += 38; ok.push(`P/E ${val.per}x 低於一年均值 ${val.per_avg_1y}x（-${Math.abs(diff).toFixed(0)}%），估值偏低`); }
+    else if (diff <= 15)  { pts += 28; ok.push(`P/E ${val.per}x 接近一年均值 ${val.per_avg_1y}x，估值合理`); }
+    else if (diff <= 30)  { pts += 15; warn.push(`P/E ${val.per}x 高於均值 ${diff.toFixed(0)}%，估值偏貴`); }
+    else { pts += 0; warn.push(`P/E ${val.per}x 高於均值 ${diff.toFixed(0)}%，估值明顯偏貴`); }
+  } else if (isNum(val.per)) {
+    max += 20;
+    pts += 10;
+    ok.push(`P/E ${val.per}x（無歷史均值可比較）`);
+  }
+  if (isNum(val.yield)) {
+    max += 30;
+    if (val.yield >= 5)       { pts += 28; ok.push(`殖利率 ${val.yield}% 高，防守吸引力強`); }
+    else if (val.yield >= 3)  { pts += 20; ok.push(`殖利率 ${val.yield}%，普通`); }
+    else if (val.yield >= 1)  { pts += 10; ok.push(`殖利率 ${val.yield}%，偏低`); }
+    else fail.push(`殖利率極低`);
+  }
+  if (isNum(val.pbr)) {
+    max += 30;
+    if (val.pbr < 1)      { pts += 28; ok.push(`P/B ${val.pbr}x 低於淨值，具安全邊際`); }
+    else if (val.pbr < 3) { pts += 20; ok.push(`P/B ${val.pbr}x 合理`); }
+    else if (val.pbr < 6) { pts += 10; ok.push(`P/B ${val.pbr}x 偏高`); }
+    else fail.push(`P/B ${val.pbr}x 極高`);
+  }
+
+  if (max === 0) return { score: null, status: 'insufficient_data', ok, fail, name: '估值合理性' };
+  const score = Math.round(pts / max * 100);
+  const status = score >= 70 ? 'bullish' : score >= 50 ? 'neutral' : 'bearish';
+  return { score, status, ok, fail: [...fail, ...warn], name: '估值合理性' };
+}
+
+// ── Strategy 5: 新聞催化評分 ─────────────────────────────────
+function calcNewsStrategy(articles) {
+  if (!articles?.length) return { score: null, status: 'insufficient_data', ok: [], fail: [], name: '新聞催化' };
+  const now = Date.now();
+  let fresh = 0, stale = 0;
+  const ok = [], fail = [];
+  for (const a of articles) {
+    if (!a.published) { stale++; continue; }
+    const d = new Date(a.published);
+    if (isNaN(d)) { stale++; continue; }
+    const days = (now - d.getTime()) / 86400000;
+    if (days <= 3) fresh++;
+    else if (days <= 7) fresh += 0.7;
+    else if (days <= 14) fresh += 0.3;
+    else stale++;
+  }
+  const total = articles.length;
+  if (total === 0) return { score: null, status: 'insufficient_data', ok: [], fail: [], name: '新聞催化' };
+  if (fresh < 1) {
+    fail.push('近期無新鮮新聞，日期過舊，不宜作為近期催化依據');
+    return { score: 20, status: 'neutral', ok, fail, name: '新聞催化' };
+  }
+  const score = Math.min(80, Math.round(fresh / total * 80) + 20);
+  ok.push(`近期有 ${Math.round(fresh)} 篇新鮮新聞（3日內）`);
+  if (stale > 0) fail.push(`${stale} 篇新聞日期較舊，僅作背景參考`);
+  return { score, status: score >= 60 ? 'bullish' : 'neutral', ok, fail, name: '新聞催化' };
+}
+
+// ── 綜合策略計算 ─────────────────────────────────────────────
+function calculateStrategy(data, articles) {
+  const price = data.price?.close;
+  const ind   = data.indicators || {};
+  const val   = data.valuation;
+  const isUS  = data.market === 'us';
+
+  const s1 = calcMAAlignStrategy(price, ind);
+  const s2 = calcMAPullbackStrategy(price, ind);
+  const s3 = calcMomentumStrategy(price, ind);
+  const s4 = calcValuationStrategy(price, ind, val);
+  const s5 = calcNewsStrategy(articles);
+
+  const totalScore = weightedAvg([
+    { score: s1.score, w: 25 },
+    { score: s3.score, w: 20 },
+    { score: s4.score, w: 25 },
+    { score: s2.score, w: 15 },
+    { score: s5.score, w: 15 },
+  ]);
+
+  // ── 強制降級條件 ──
+  const overheated = (isNum(ind.rsi) && ind.rsi > 80) ||
+    (isNum(price) && isNum(ind.ma20) && (price - ind.ma20) / ind.ma20 > 0.2);
+
+  let action = 'watch_wait';
+  if (totalScore === null) action = 'insufficient_data';
+  else if (overheated) action = 'do_not_chase';
+  else if (totalScore >= 75) action = 'can_accumulate';
+  else if (totalScore >= 55) action = 'watch_wait';
+  else if (totalScore >= 40) action = 'watch_wait';
+  else action = 'high_risk';
+
+  const actionLabel = { can_accumulate: '🟢 可分批布局', watch_wait: '🟡 觀察等待', do_not_chase: '🟠 偏高不追', high_risk: '🔴 風險偏高', insufficient_data: '⚫ 資料不足' }[action];
+  const actionColor = { can_accumulate: 'var(--green)', watch_wait: 'var(--yellow)', do_not_chase: 'var(--orange)', high_risk: 'var(--red)', insufficient_data: 'var(--text3)' }[action];
+
+  // ── 分批進場區 ──
+  const batches = [];
+  if (isNum(ind.ma20))  batches.push({ label: '第 1 批（30%）', price: ind.ma20, range: `${safeP(ind.ma20*0.97)} – ${safeP(ind.ma20*1.03)}`, reason: '回測月線(MA20)附近' });
+  if (isNum(ind.ma60))  batches.push({ label: '第 2 批（40%）', price: ind.ma60, range: `${safeP(ind.ma60*0.97)} – ${safeP(ind.ma60*1.03)}`, reason: '回測季線(MA60)附近' });
+  if (isNum(ind.ma120)) batches.push({ label: '第 3 批（30%）', price: ind.ma120, range: `${safeP(ind.ma120*0.97)} – ${safeP(ind.ma120*1.03)}`, reason: '回測半年線(MA120)附近' });
+
+  // ── 停損規則 ──
+  const stopLoss = [];
+  if (isNum(ind.ma60))  stopLoss.push(`跌破季線(MA60) ${safeP(ind.ma60)} 且 3 日無法站回 → 減碼`);
+  if (isNum(ind.ma120)) stopLoss.push(`跌破半年線(MA120) ${safeP(ind.ma120)} → 中期趨勢轉弱`);
+  if (isNum(ind.ma240)) stopLoss.push(`跌破年線(MA240) ${safeP(ind.ma240)} → 長線結構破壞`);
+
+  // ── 主要風險 ──
+  const risks = [];
+  if (isNum(ind.rsi) && ind.rsi > 75) risks.push(`RSI ${ind.rsi} 偏高，短線過熱`);
+  if (isNum(price) && isNum(ind.ma20)) {
+    const b = ((price - ind.ma20) / ind.ma20 * 100).toFixed(1);
+    if (parseFloat(b) > 10) risks.push(`現價距月線乖離 +${b}%，偏大`);
+  }
+  if (val?.per && val?.per_avg_1y && val.per > val.per_avg_1y * 1.3) risks.push(`P/E ${val.per}x 高於一年均值逾 30%`);
+  if (s5.score !== null && s5.score < 40) risks.push('近期新聞日期偏舊，缺乏新鮮催化');
+  risks.push('以上分析僅供研究參考，不構成投資建議');
+
+  return { totalScore, action, actionLabel, actionColor, overheated, strategies: [s1, s2, s3, s4, s5], batches, stopLoss, risks };
+}
 
 async function fetchAnalystData(data) {
   const el = document.getElementById('analyst-placeholder');
@@ -1303,6 +1595,14 @@ function generateFallbackSummary(data) {
 
 async function fetchAIZone(data, analyst) {
   _lastAIData = data;
+
+  // ── Phase 1: 規則計算策略分數（立即顯示，不等 AI）──
+  const strategyEl = document.getElementById('strategy-result-placeholder');
+  let strategy = null;
+  try {
+    strategy = calculateStrategy(data, _lastNewsArticles || []);
+    if (strategyEl) strategyEl.outerHTML = renderStrategySection(strategy);
+  } catch(e) { if (strategyEl) strategyEl.remove(); }
   const el = document.getElementById('ai-zone-placeholder');
   if (!el) return;
   const cur = data.currency || (data.market === 'us' ? 'USD' : 'TWD');
@@ -1311,7 +1611,7 @@ async function fetchAIZone(data, analyst) {
   try {
     const res = await fetch('/api/ai-zone', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...data, analyst, market_context: getStrategyMemo() }), signal: controller.signal
+      body: JSON.stringify({ ...data, analyst, market_context: getStrategyMemo(), strategy: strategy ? { totalScore: strategy.totalScore, action: strategy.action, actionLabel: strategy.actionLabel, overheated: strategy.overheated } : null }), signal: controller.signal
     });
     clearTimeout(timer);
     const bz = await res.json();
@@ -1359,7 +1659,8 @@ async function fetchNews(data) {
     const res = await fetch('/api/news?' + params);
     const json = await res.json();
     if (!res.ok) throw new Error(json.error || '新聞載入失敗');
-    el.outerHTML = renderNewsHTML(json.articles || [], json);
+    _lastNewsArticles = json.articles || [];
+    el.outerHTML = renderNewsHTML(_lastNewsArticles, json);
   } catch(e) {
     if (el) el.innerHTML = `<div class="news-empty">新聞暫時無法載入：${e.message}</div>`;
   }
@@ -1449,6 +1750,9 @@ function renderResult(d) {
 
     <!-- Analyst placeholder -->
     <div id="analyst-placeholder"><div style="height:4px"></div></div>
+
+    <!-- Strategy Section placeholder -->
+    <div id="strategy-result-placeholder"></div>
 
     <!-- AI Zone placeholder -->
     <div class="buy-zone-card" id="ai-zone-placeholder">
