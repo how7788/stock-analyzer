@@ -91,9 +91,15 @@ function generateSignal(price,ma20,ma60,ma120,ma240,rsi,macdHist,monthK){
 }
 
 module.exports = async function handler(req,res){
-  res.setHeader("Access-Control-Allow-Origin","*");
+  // 只允許自己的網域與本機開發環境呼叫，避免 API 額度被第三方盜用
+  const _origin = req.headers.origin || "";
+  if (/^https?:\/\/(localhost(:\d+)?|127\.0\.0\.1(:\d+)?)$/.test(_origin) || /\.vercel\.app$/.test((()=>{try{return new URL(_origin).hostname}catch(_){return ""}})())) {
+    res.setHeader("Access-Control-Allow-Origin", _origin);
+    res.setHeader("Vary", "Origin");
+  }
   res.setHeader("Access-Control-Allow-Methods","GET, OPTIONS");
   res.setHeader("Content-Type","application/json");
+  res.setHeader("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");
   if(req.method==="OPTIONS")return res.status(200).end();
 
   let { symbol } = req.query;
