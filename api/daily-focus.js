@@ -116,11 +116,7 @@ ${newsText}
   ]
 }
 
-規則：cards 固定4個，涵蓋不同產業面向；source 用實際新聞來源；summary 約100字；sectors 2-3個台股板塊名稱；color 從 blue/green/amber/purple/red/teal 選一個。重要：只使用上方提供的新聞內容。以下情況請跳過該文章改選其他：
-1. 文章提到台股指數點位低於 42,000 點是「歷史新高」或「新高紀錄」→ 這是舊聞，實際上台股早已突破更高位置
-2. 文章提到費半或美股指數達到某點位是「歷史新高」但數字明顯偏低 → 同樣是舊聞
-3. 文章日期超過 3 天 → 降低使用優先度
-寧可卡片內容稍少，也不要使用過時的舊新聞。`;
+規則：cards 固定4個，涵蓋不同產業面向；source 用實際新聞來源；summary 約100字；sectors 2-3個台股板塊名稱；color 從 blue/green/amber/purple/red/teal 選一個。重要：只使用上方提供的新聞內容，若新聞中出現明顯過時的數字或事件（如舊點位、舊消息），請跳過該新聞改選其他較新的內容。`;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 22000);
@@ -165,9 +161,15 @@ function getAvailableDates() {
 }
 
 module.exports = async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  // 只允許自己的網域與本機開發環境呼叫，避免 API 額度被第三方盜用
+  const _origin = req.headers.origin || "";
+  if (/^https?:\/\/(localhost(:\d+)?|127\.0\.0\.1(:\d+)?)$/.test(_origin) || /\.vercel\.app$/.test((()=>{try{return new URL(_origin).hostname}catch(_){return ""}})())) {
+    res.setHeader("Access-Control-Allow-Origin", _origin);
+    res.setHeader("Vary", "Origin");
+  }
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Content-Type", "application/json");
+  res.setHeader("Cache-Control", "public, s-maxage=900, stale-while-revalidate=1800");
   if (req.method === "OPTIONS") return res.status(200).end();
 
   const tavilyKey = process.env.TAVILY_API_KEY;
