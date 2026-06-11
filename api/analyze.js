@@ -124,9 +124,15 @@ function generateSignal(price, ma20, ma60, ma120, ma240, rsi, macdHist, monthK) 
 }
 
 module.exports = async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  // 只允許自己的網域與本機開發環境呼叫，避免 API 額度被第三方盜用
+  const _origin = req.headers.origin || "";
+  if (/^https?:\/\/(localhost(:\d+)?|127\.0\.0\.1(:\d+)?)$/.test(_origin) || /\.vercel\.app$/.test((()=>{try{return new URL(_origin).hostname}catch(_){return ""}})())) {
+    res.setHeader("Access-Control-Allow-Origin", _origin);
+    res.setHeader("Vary", "Origin");
+  }
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Content-Type", "application/json");
+  res.setHeader("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");
   if (req.method === "OPTIONS") return res.status(200).end();
 
   const { stock_id } = req.query;
@@ -163,29 +169,48 @@ module.exports = async function handler(req, res) {
     if (ma120arr[n-1] != null) maPos.push(p > ma120arr[n-1] ? `站上半年線（${ma120arr[n-1]}）` : `跌破半年線（${ma120arr[n-1]}）`);
     if (ma240arr[n-1] != null) maPos.push(p > ma240arr[n-1] ? `站上年線（${ma240arr[n-1]}）`   : `跌破年線（${ma240arr[n-1]}）`);
 
-    let valuation = null;
-    let stockNameFromPer = null;
-    try {
-      const perRaw = await finmindFetch("TaiwanStockPER", cleanId, daysAgo(400));
-      if (perRaw?.length > 0) {
-        const last = perRaw[perRaw.length - 1];
-        stockNameFromPer = last.stock_name || last.name || null;
-        const pers = perRaw.map(d => d.PER).filter(v => v != null && v > 0);
-        const perAvg = pers.length ? Math.round(pers.reduce((a,v) => a+v, 0) / pers.length * 10) / 10 : null;
-        const perMin = pers.length ? Math.round(Math.min(...pers) * 10) / 10 : null;
-        const perMax = pers.length ? Math.round(Math.max(...pers) * 10) / 10 : null;
-        valuation = {
-          date: last.date,
-          per: last.PER != null ? Math.round(last.PER * 10) / 10 : null,
-          pbr: last.PBR != null ? Math.round(last.PBR * 100) / 100 : null,
-          yield: last.dividend_yield != null ? Math.round(last.dividend_yield * 100) / 100 : null,
-          per_avg_1y: perAvg, per_min_1y: perMin, per_max_1y: perMax,
-        };
-      }
-    } catch (_) {}
+    // ★ 三項輔助資料改為並行抓取（原本為串行，容易拖慢回應甚至 timeout）
+    let valuation = null, stockNameFromPer = null, monthly_revenue = null, dividends = [];
+    const [perR, revR, divR] = await Promise.allSettled([
+      finmindFetch("TaiwanStockPER", cleanId, daysAgo(400)),
+      finmindFetch("TaiwanStockMonthRevenue", cleanId, daysAgo(90)),
+      finmindFetch("TaiwanStockDividend", cleanId, daysAgo(1200)),
+    ]);
+
+    if (perR.status === "fulfilled" && perR.value?.length > 0) {
+      const perRaw = perR.value;
+      const last = perRaw[perRaw.length - 1];
+      stockNameFromPer = last.stock_name || last.name || null;
+      const pers = perRaw.map(d => d.PER).filter(v => v != null && v > 0);
+      const perAvg = pers.length ? Math.round(pers.reduce((a,v) => a+v, 0) / pers.length * 10) / 10 : null;
+      const perMin = pers.length ? Math.round(Math.min(...pers) * 10) / 10 : null;
+      const perMax = pers.length ? Math.round(Math.max(...pers) * 10) / 10 : null;
+      valuation = {
+        date: last.date,
+        per: last.PER != null ? Math.round(last.PER * 10) / 10 : null,
+        pbr: last.PBR != null ? Math.round(last.PBR * 100) / 100 : null,
+        yield: last.dividend_yield != null ? Math.round(last.dividend_yield * 100) / 100 : null,
+        per_avg_1y: perAvg, per_min_1y: perMin, per_max_1y: perMax,
+      };
+    }
+
+    if (revR.status === "fulfilled" && revR.value?.length > 0) {
+      const revRaw = revR.value.slice().sort((a, b) => a.date.localeCompare(b.date));
+      const last = revRaw[revRaw.length - 1], prev2 = revRaw.length >= 2 ? revRaw[revRaw.length - 2] : null;
+      monthly_revenue = { date: last.date, revenue: last.revenue, yoy: last.revenue_year_over_year ?? null, mom: prev2?.revenue ? Math.round((last.revenue - prev2.revenue) / prev2.revenue * 10000) / 100 : null };
+    }
+
+    if (divR.status === "fulfilled" && divR.value?.length > 0) {
+      dividends = divR.value.slice(-6).reverse().map(d => ({
+        date: d.date,
+        cash: d.cash_dividend != null ? Math.round(d.cash_dividend * 100) / 100 : null,
+        stock: d.stock_dividend != null ? Math.round(d.stock_dividend * 100) / 100 : null,
+        type: d.type || null,
+      }));
+    }
 
     // 若仍無股名，從 TaiwanStockInfo 補抓
-    if (!stockNameFromPer) {
+    if (!stockNameFromPer && !latest.stock_name) {
       try {
         const token = process.env.FINMIND_TOKEN;
         const infoRes = await fetch(`${FINMIND_BASE}?dataset=TaiwanStockInfo&data_id=${encodeURIComponent(cleanId)}&token=${token}`);
@@ -196,30 +221,6 @@ module.exports = async function handler(req, res) {
         }
       } catch (_) {}
     }
-
-    let monthly_revenue = null;
-    try {
-      const revRaw = await finmindFetch("TaiwanStockMonthRevenue", cleanId, daysAgo(90));
-      if (revRaw?.length > 0) {
-        revRaw.sort((a, b) => a.date.localeCompare(b.date));
-        const last = revRaw[revRaw.length - 1], prev2 = revRaw.length >= 2 ? revRaw[revRaw.length - 2] : null;
-        monthly_revenue = { date: last.date, revenue: last.revenue, yoy: last.revenue_year_over_year ?? null, mom: prev2?.revenue ? Math.round((last.revenue - prev2.revenue) / prev2.revenue * 10000) / 100 : null };
-      }
-    } catch (_) {}
-
-    // 股利資料
-    let dividends = [];
-    try {
-      const divRaw = await finmindFetch("TaiwanStockDividend", cleanId, daysAgo(1200));
-      if (divRaw?.length > 0) {
-        dividends = divRaw.slice(-6).reverse().map(d => ({
-          date: d.date,
-          cash: d.cash_dividend != null ? Math.round(d.cash_dividend * 100) / 100 : null,
-          stock: d.stock_dividend != null ? Math.round(d.stock_dividend * 100) / 100 : null,
-          type: d.type || null,
-        }));
-      }
-    } catch (_) {}
 
     const indicators = {
       ma5: ma5arr[n-1], ma20: ma20arr[n-1], ma60: ma60arr[n-1], ma120: ma120arr[n-1], ma240: ma240arr[n-1],
