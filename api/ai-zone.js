@@ -1,6 +1,11 @@
 // api/ai-zone.js — AI 決策儀表盤（v2: +籌碼面分析）
 module.exports = async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  // 只允許自己的網域與本機開發環境呼叫，避免 API 額度被第三方盜用
+  const _origin = req.headers.origin || "";
+  if (/^https?:\/\/(localhost(:\d+)?|127\.0\.0\.1(:\d+)?)$/.test(_origin) || /\.vercel\.app$/.test((()=>{try{return new URL(_origin).hostname}catch(_){return ""}})())) {
+    res.setHeader("Access-Control-Allow-Origin", _origin);
+    res.setHeader("Vary", "Origin");
+  }
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Content-Type", "application/json");
   if (req.method === "OPTIONS") return res.status(200).end();
@@ -103,7 +108,7 @@ ${(strategy && strategy.totalScore != null) ? "\n策略模組已計算總分："
   "risk": "medium"
 }
 
-verdict 只能是 buy/watch/avoid。entry_quality 只能是 excellent/good/fair/poor。risk 只能是 low/medium/high。score 0-100。stop_loss/target 給實際價格數字。${chipStr ? 'checklist 中法人籌碼 item 要根據實際籌碼資料判斷。' : 'checklist 中法人籌碼 status 設 null，note 依 market 設：美股設'美股無此資料'，台股設'籌碼資料暫不可用'，日股設'日股無此資料'。'}${analystStr ? ' 請參考分析師共識評等與目標價輔助判斷 score 與 verdict，並在 reason 中提及。' : ''}`;
+verdict 只能是 buy/watch/avoid。entry_quality 只能是 excellent/good/fair/poor。risk 只能是 low/medium/high。score 0-100。stop_loss/target 給實際價格數字。${chipStr ? 'checklist 中法人籌碼 item 要根據實際籌碼資料判斷。' : 'checklist 中法人籌碼 status 設 null，note 依 market 設：美股設「美股無此資料」，台股設「籌碼資料暫不可用」，日股設「日股無此資料」。'}${analystStr ? ' 請參考分析師共識評等與目標價輔助判斷 score 與 verdict，並在 reason 中提及。' : ''}`;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 25000);
