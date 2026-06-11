@@ -1,6 +1,11 @@
 // api/mkt-ai.js — 大盤分析 + 個股綜合總結（輕量 AI）
 module.exports = async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  // 只允許自己的網域與本機開發環境呼叫，避免 API 額度被第三方盜用
+  const _origin = req.headers.origin || "";
+  if (/^https?:\/\/(localhost(:\d+)?|127\.0\.0\.1(:\d+)?)$/.test(_origin) || /\.vercel\.app$/.test((()=>{try{return new URL(_origin).hostname}catch(_){return ""}})())) {
+    res.setHeader("Access-Control-Allow-Origin", _origin);
+    res.setHeader("Vary", "Origin");
+  }
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Content-Type", "application/json");
   if (req.method === "OPTIONS") return res.status(200).end();
@@ -10,6 +15,7 @@ module.exports = async function handler(req, res) {
 
   let body = req.body;
   if (typeof body === "string") { try { body = JSON.parse(body); } catch(_) {} }
+  body = body || {};
 
   const type = body.type || 'market';
 
@@ -25,8 +31,8 @@ module.exports = async function handler(req, res) {
 
     const techSummary = [
       ind.ma20 && ind.ma60 ? (ind.ma20 > ind.ma60 ? '月線站上季線多頭排列' : '月線跌破季線偏空') : '',
-      ind.rsi ? (ind.rsi > 75 ? `RSI ${ind.rsi} 偏高` : ind.rsi < 35 ? `RSI ${ind.rsi} 超賣` : `RSI ${ind.rsi} 中性`) : '',
-      ind.macd_hist ? (ind.macd_hist > 0 ? 'MACD 動能偏多' : 'MACD 動能偏空') : '',
+      ind.rsi != null ? (ind.rsi > 75 ? `RSI ${ind.rsi} 偏高` : ind.rsi < 35 ? `RSI ${ind.rsi} 超賣` : `RSI ${ind.rsi} 中性`) : '',
+      ind.macd_hist != null ? (ind.macd_hist > 0 ? 'MACD 動能偏多' : 'MACD 動能偏空') : '',
     ].filter(Boolean).join('、');
 
     const valSummary = val.per && val.per_avg_1y
