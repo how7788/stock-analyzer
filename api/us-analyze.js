@@ -99,16 +99,75 @@ function generateSignal(price, ma20, ma60, ma120, ma240, rsi, macdHist, monthK) 
 }
 
 module.exports = async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin","*");
+  // 只允許自己的網域與本機開發環境呼叫，避免 API 額度被第三方盜用
+  const _origin = req.headers.origin || "";
+  if (/^https?:\/\/(localhost(:\d+)?|127\.0\.0\.1(:\d+)?)$/.test(_origin) || /\.vercel\.app$/.test((()=>{try{return new URL(_origin).hostname}catch(_){return ""}})())) {
+    res.setHeader("Access-Control-Allow-Origin", _origin);
+    res.setHeader("Vary", "Origin");
+  }
   res.setHeader("Access-Control-Allow-Methods","GET, OPTIONS");
   res.setHeader("Content-Type","application/json");
+  res.setHeader("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");
   if(req.method==="OPTIONS")return res.status(200).end();
+
+  // ── mode=analyst：分析師共識評等/目標價 ──────────────────────
+  // 前端原本呼叫的 /api/analyst 從未存在（Vercel 12 函式已滿），
+  // 改為掛在本函式的 mode 參數下，不佔用額外函式名額。
+  if (req.query.mode === "analyst") {
+    const id = (req.query.stock_id || req.query.symbol || "").trim();
+    if (!id) return res.status(400).json({ error: "缺少 stock_id" });
+    const mkt = (req.query.market || "us").toLowerCase();
+    const candidates = mkt === "tw" ? [`${id}.TW`, `${id}.TWO`]
+                     : mkt === "jp" ? [`${id.replace(/\.T$/i, "")}.T`]
+                     : [id.toUpperCase().replace(/\./g, "-")];
+    const UA = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" };
+    try {
+      // Yahoo quoteSummary 需要 cookie + crumb
+      const cRes = await fetch("https://fc.yahoo.com/", { headers: UA, redirect: "manual", signal: AbortSignal.timeout(6000) });
+      const cookie = (cRes.headers.get("set-cookie") || "").split(";")[0];
+      if (!cookie) throw new Error("no cookie");
+      const crumbRes = await fetch("https://query1.finance.yahoo.com/v1/test/getcrumb", { headers: { ...UA, cookie }, signal: AbortSignal.timeout(6000) });
+      const crumb = (await crumbRes.text()).trim();
+      if (!crumb || crumb.includes("{")) throw new Error("no crumb");
+
+      let fin = null, trendRaw = null;
+      for (const s of candidates) {
+        const u = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(s)}?modules=financialData,recommendationTrend&crumb=${encodeURIComponent(crumb)}`;
+        const r = await fetch(u, { headers: { ...UA, cookie }, signal: AbortSignal.timeout(6000) });
+        if (!r.ok) continue;
+        const j = await r.json();
+        const result = j?.quoteSummary?.result?.[0];
+        if (result?.financialData) { fin = result.financialData; trendRaw = result.recommendationTrend?.trend?.[0] || null; break; }
+      }
+      if (!fin || !fin.numberOfAnalystOpinions?.raw) {
+        return res.status(200).json({ available: false });
+      }
+      const cur = fin.currentPrice?.raw ?? null;
+      const mean = fin.targetMeanPrice?.raw ?? null;
+      const recKey = fin.recommendationKey || null;
+      const REC_LABEL = { strong_buy: "強力買入", buy: "買入", hold: "持有", underperform: "賣出", sell: "強力賣出" };
+      return res.status(200).json({
+        available: true,
+        numAnalysts: fin.numberOfAnalystOpinions.raw,
+        recKey: recKey ? recKey.replace("_", "") : null,
+        recLabel: REC_LABEL[recKey] || recKey || null,
+        recMean: fin.recommendationMean?.raw ?? null,
+        targetMean: mean, targetLow: fin.targetLowPrice?.raw ?? null, targetHigh: fin.targetHighPrice?.raw ?? null,
+        currentPrice: cur,
+        upside: cur && mean ? Math.round((mean - cur) / cur * 10000) / 100 : null,
+        trend: trendRaw ? { strongBuy: trendRaw.strongBuy || 0, buy: trendRaw.buy || 0, hold: trendRaw.hold || 0, sell: trendRaw.sell || 0, strongSell: trendRaw.strongSell || 0 } : null,
+      });
+    } catch (e) {
+      return res.status(200).json({ available: false });
+    }
+  }
 
   const { symbol } = req.query;
   if(!symbol)return res.status(400).json({error:"請提供股票代號，例如 AAPL"});
 
-  const sym = symbol.trim().toUpperCase();
-  if(!/^[A-Z]{1,5}$/.test(sym))return res.status(400).json({error:`「${sym}」不是有效的美股代號`});
+  // 支援 BRK.B / BRK-B 等含類股別的代號（Yahoo 使用 dash 格式）
+  const sym = symbol.trim().toUpperCase().replace(/\./g, "-");
+  if(!/^[A-Z]{1,5}(-[A-Z]{1,2})?$/.test(sym))return res.status(400).json({error:`「${symbol.trim()}」不是有效的美股代號`});
 
   try {
     const url=`${BASE}/${encodeURIComponent(sym)}?interval=1d&range=2y`;
