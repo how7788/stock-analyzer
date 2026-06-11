@@ -116,7 +116,11 @@ ${newsText}
   ]
 }
 
-規則：cards 固定4個，涵蓋不同產業面向；source 用實際新聞來源；summary 約100字；sectors 2-3個台股板塊名稱；color 從 blue/green/amber/purple/red/teal 選一個。重要：只使用上方提供的新聞內容，若新聞中出現明顯過時的數字或事件（如舊點位、舊消息），請跳過該新聞改選其他較新的內容。`;
+規則：cards 固定4個，涵蓋不同產業面向；source 用實際新聞來源；summary 約100字；sectors 2-3個台股板塊名稱；color 從 blue/green/amber/purple/red/teal 選一個。重要：只使用上方提供的新聞內容。以下情況請跳過該文章改選其他：
+1. 文章提到台股指數點位低於 42,000 點是「歷史新高」或「新高紀錄」→ 這是舊聞，實際上台股早已突破更高位置
+2. 文章提到費半或美股指數達到某點位是「歷史新高」但數字明顯偏低 → 同樣是舊聞
+3. 文章日期超過 3 天 → 降低使用優先度
+寧可卡片內容稍少，也不要使用過時的舊新聞。`;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 22000);
