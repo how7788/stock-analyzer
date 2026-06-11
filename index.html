@@ -703,6 +703,18 @@ let themeMarket = 'tw';
 try { watchlist = JSON.parse(localStorage.getItem('wl_v2') || '[]'); } catch(_) {}
 function saveWatchlist() { try { localStorage.setItem('wl_v2', JSON.stringify(watchlist)); } catch(_) {} }
 
+// ── 安全輸出工具：外部來源（新聞、AI 回傳）的文字一律先轉義再塞進 innerHTML ──
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+// 用於 href：只允許 http/https，其它一律擋掉
+function safeUrl(u) {
+  try { const p = new URL(u); if (p.protocol === 'http:' || p.protocol === 'https:') return esc(u); } catch(_) {}
+  return '#';
+}
+// 用於 onclick 內的股票代號：只保留代號合法字元
+function safeId(s) { return String(s ?? '').replace(/[^A-Za-z0-9.\-]/g, ''); }
+
 // ── Init ──
 window.addEventListener('DOMContentLoaded', () => {
   fetchMarketData();
@@ -1002,14 +1014,14 @@ function renderFocusCards(data) {
   }
   const cards = (data.cards || []).map(c => {
     const bc = colorMap[c.color] || 'badge-gray';
-    const sectors = (c.sectors || []).map(s => `<span class="sector-tag">${s}</span>`).join('');
+    const sectors = (c.sectors || []).map(s => `<span class="sector-tag">${esc(s)}</span>`).join('');
     return `<div class="focus-card">
       <div class="focus-card-top">
-        <span class="focus-source-badge ${bc}">${c.source || '財經媒體'}</span>
+        <span class="focus-source-badge ${bc}">${esc(c.source || '財經媒體')}</span>
         <span class="focus-date">${data.date || ''}</span>
       </div>
-      <div class="focus-title">${c.title}</div>
-      <div class="focus-summary">${c.summary}</div>
+      <div class="focus-title">${esc(c.title)}</div>
+      <div class="focus-summary">${esc(c.summary)}</div>
       <div class="focus-sectors">${sectors}</div>
     </div>`;
   }).join('');
@@ -1018,7 +1030,7 @@ function renderFocusCards(data) {
 
 // ── Phase 4: Watchlist ───────────────────────────────────────────
 function addToWatchlist() {
-  const id = document.getElementById('wlInput').value.trim().toUpperCase();
+  const id = safeId(document.getElementById('wlInput').value.trim().toUpperCase());
   if (!id) return;
   if (watchlist.length >= 20) { alert('最多 20 檔'); return; }
   if (watchlist.find(w => w.id === id)) { alert(`${id} 已在清單中`); return; }
@@ -1051,7 +1063,7 @@ function renderWatchlist() {
           <div style="display:flex;align-items:center;gap:6px;">
             <span class="wl-id" style="font-size:14px;font-weight:700;color:var(--text);font-family:'JetBrains Mono',monospace;">${w.id}</span>
           </div>
-          <div style="font-size:11px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;min-height:14px;">${w.name !== w.id ? w.name : ''}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;min-height:14px;">${w.name !== w.id ? esc(w.name) : ''}</div>
         </div>
         <button class="wl-remove" onclick="event.stopPropagation();removeFromWatchlist('${w.id}')" title="移除">×</button>
       </div>
@@ -1731,7 +1743,7 @@ async function fetchAnalystData(data) {
   const el = document.getElementById('analyst-placeholder');
   try {
     const params = new URLSearchParams({ stock_id: data.stock_id, market: data.market || 'tw' });
-    const res = await fetch('/api/analyst?' + params);
+    const res = await fetch('/api/us-analyze?mode=analyst&' + params);
     const analyst = await res.json();
     if (!res.ok || analyst.error) throw new Error(analyst.error || 'failed');
     if (!analyst.available) throw new Error('no data');
@@ -2391,9 +2403,9 @@ function renderNewsHTML(articles, meta) {
       ? `<div style="margin:8px 0;padding:6px 10px;background:rgba(245,158,11,.06);border-radius:6px;font-size:11px;color:var(--yellow);">近14日內新聞不足，以下補充較早資料，僅供參考。</div>`
       : '';
     return divider + `<div class="news-item">
-      <a href="${a.url}" target="_blank" rel="noopener">${a.title}</a>
-      <div class="news-meta"><span class="news-source">${a.source}</span><span class="news-date">${pubStr}</span></div>
-      ${a.snippet ? `<div class="news-snippet">${a.snippet}</div>` : ''}
+      <a href="${safeUrl(a.url)}" target="_blank" rel="noopener">${esc(a.title)}</a>
+      <div class="news-meta"><span class="news-source">${esc(a.source)}</span><span class="news-date">${pubStr}</span></div>
+      ${a.snippet ? `<div class="news-snippet">${esc(a.snippet)}</div>` : ''}
     </div>`;
   }).join('');
   return `<div class="news-card"><div class="res-card-title">最新新聞輿情（近14日，最新優先）</div><div class="news-list">${items}</div></div>`;
@@ -2445,24 +2457,24 @@ function renderThemes(d) {
   const themesHtml = (d.themes || []).map(t => {
     const hf = t.heat >= 9 ? '🔥🔥' : t.heat >= 7 ? '🔥' : t.heat >= 5 ? '🌡️' : '❄️';
     const stocks = (t.key_stocks || []).map(s =>
-      `<div class="theme-stock" onclick="quickSearch('${s.id}')">
-        <span class="ts-id">${s.id}</span><span class="ts-name">${s.name}</span>
-        <span class="ts-reason">${s.reason}</span>
+      `<div class="theme-stock" onclick="quickSearch('${safeId(s.id)}')">
+        <span class="ts-id">${esc(s.id)}</span><span class="ts-name">${esc(s.name)}</span>
+        <span class="ts-reason">${esc(s.reason)}</span>
       </div>`).join('');
     return `<div class="theme-card">
-      <div class="theme-top"><span class="theme-name">${t.name}</span>
+      <div class="theme-top"><span class="theme-name">${esc(t.name)}</span>
       <div class="theme-heat-badge"><span>${hf}</span><span class="heat-score">${t.heat}/10</span></div></div>
-      <div class="theme-why">💡 ${t.why_hot}</div>
+      <div class="theme-why">💡 ${esc(t.why_hot)}</div>
       <div class="theme-stocks">${stocks}</div>
-      ${t.risk ? `<div class="theme-risk">⚠️ ${t.risk}</div>` : ''}
+      ${t.risk ? `<div class="theme-risk">⚠️ ${esc(t.risk)}</div>` : ''}
     </div>`;
   }).join('');
-  const watchHtml = (d.watch_list || []).map(id => `<span class="watch-chip" onclick="quickSearch('${id}')">${id}</span>`).join('');
-  const avoidHtml = (d.avoid_sectors || []).map(s => `<span class="watch-chip">${s}</span>`).join('');
+  const watchHtml = (d.watch_list || []).map(id => `<span class="watch-chip" onclick="quickSearch('${safeId(id)}')">${esc(id)}</span>`).join('');
+  const avoidHtml = (d.avoid_sectors || []).map(s => `<span class="watch-chip">${esc(s)}</span>`).join('');
   const newsHtml = (d.news_sources || []).slice(0, 5).map(a =>
-    `<div class="tn-item"><a href="${a.url}" target="_blank" rel="noopener">${a.title}</a><span class="tn-source">${a.source}</span></div>`).join('');
+    `<div class="tn-item"><a href="${safeUrl(a.url)}" target="_blank" rel="noopener">${esc(a.title)}</a><span class="tn-source">${esc(a.source)}</span></div>`).join('');
   return `
-    <div class="mood-bar"><span class="mood-label">市場氣氛</span><span class="mood-value ${moodClass}">${moodIcon}${d.market_mood || '—'}</span><span class="mood-reason">${d.mood_reason || ''}</span></div>
+    <div class="mood-bar"><span class="mood-label">市場氣氛</span><span class="mood-value ${moodClass}">${moodIcon}${d.market_mood || '—'}</span><span class="mood-reason">${esc(d.mood_reason || '')}</span></div>
     <div class="themes-grid">${themesHtml}</div>
     ${watchHtml ? `<div class="watch-section"><div class="watch-title">📌 值得追蹤（點擊直接分析）</div><div class="watch-chips">${watchHtml}</div></div>` : ''}
     ${avoidHtml ? `<div class="watch-section"><div class="watch-title">⚠️ 目前應避開族群</div><div class="watch-chips avoid-chips">${avoidHtml}</div></div>` : ''}
