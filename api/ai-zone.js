@@ -105,10 +105,17 @@ ${(strategy && strategy.totalScore != null) ? "\n策略模組已計算總分："
   "wait_for": null,
   "risk_factors": ["月KD偏高短線有回檔", "大盤系統風險"],
   "catalysts": ["站上所有均線", "外資連續買超", "MACD持續翻正"],
-  "risk": "medium"
+  "risk": "medium",
+  "fundamental": {
+    "business": "一句話說明公司主要做什麼、靠什麼賺錢（營收結構）",
+    "moat": "競爭護城河：技術/規模/品牌/轉換成本等優勢，以及主要競爭對手",
+    "industry": "所屬產業現況與中長期趨勢，產業處於成長/成熟/衰退哪個階段",
+    "chain": "上下游關係：主要供應商與客戶、在產業鏈中的位置與議價能力",
+    "outlook": "綜合基本面的中長期展望與最該留意的風險"
+  }
 }
 
-verdict 只能是 buy/watch/avoid。entry_quality 只能是 excellent/good/fair/poor。risk 只能是 low/medium/high。score 0-100。stop_loss/target 給實際價格數字。${chipStr ? 'checklist 中法人籌碼 item 要根據實際籌碼資料判斷。' : 'checklist 中法人籌碼 status 設 null，note 依 market 設：美股設「美股無此資料」，台股設「籌碼資料暫不可用」，日股設「日股無此資料」。'}${analystStr ? ' 請參考分析師共識評等與目標價輔助判斷 score 與 verdict，並在 reason 中提及。' : ''}`;
+fundamental 各欄請用你對該公司的既有認識填寫具體內容（中文，每欄 1-3 句，不要空泛套話）；若對該公司確實不熟，該欄填「資料不足」。verdict 只能是 buy/watch/avoid。entry_quality 只能是 excellent/good/fair/poor。risk 只能是 low/medium/high。score 0-100。stop_loss/target 給實際價格數字。${chipStr ? 'checklist 中法人籌碼 item 要根據實際籌碼資料判斷。' : 'checklist 中法人籌碼 status 設 null，note 依 market 設：美股設「美股無此資料」，台股設「籌碼資料暫不可用」，日股設「日股無此資料」。'}${analystStr ? ' 請參考分析師共識評等與目標價輔助判斷 score 與 verdict，並在 reason 中提及。' : ''}`;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 25000);
@@ -117,7 +124,7 @@ verdict 只能是 buy/watch/avoid。entry_quality 只能是 excellent/good/fair/
     const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST", signal: controller.signal,
       headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1500, messages: [{ role: "user", content: prompt }] }),
+      body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 2200, messages: [{ role: "user", content: prompt }] }),
     });
     clearTimeout(timeout);
     if (!r.ok) throw new Error(`Claude API 錯誤 ${r.status}`);
