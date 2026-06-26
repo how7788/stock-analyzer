@@ -230,6 +230,14 @@ section{margin-bottom:32px;}
 /* ── Result Area ── */
 #result,#compare-result{max-width:960px;margin:20px auto 0;}
 .res-card{background:var(--card2);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:12px;}
+.fund-card{background:linear-gradient(180deg,var(--card),var(--card2));}
+.fund-card .res-card-title{display:flex;align-items:center;gap:8px;}
+.fund-ai-tag{font-size:10px;font-weight:600;color:#6366f1;background:rgba(99,102,241,.1);border-radius:4px;padding:2px 7px;margin-left:auto;}
+.fund-list{display:flex;flex-direction:column;gap:14px;margin-top:14px;}
+.fund-row{display:flex;flex-direction:column;gap:4px;}
+.fund-label{font-size:13px;font-weight:600;color:var(--text);}
+.fund-text{font-size:13px;line-height:1.75;color:var(--text2);padding-left:2px;}
+.fund-note{font-size:11px;color:var(--text3);margin-top:14px;padding-top:12px;border-top:1px dashed var(--border);}
 .res-card-title{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px;}
 
 /* Stock header */
@@ -2057,7 +2065,25 @@ function renderResult(d) {
   const macdColor = ind.macd_hist > 0 ? 'var(--green)' : 'var(--red)';
   const monthKColor = ind.month_k < 30 ? 'var(--green)' : ind.month_k > 70 ? 'var(--yellow)' : 'var(--text)';
 
-  const chipHtml = '';
+  // 三大法人近5日買賣超（台股限定）
+  let chipHtml = '';
+  if (d.institutional && d.institutional.days > 0) {
+    const it = d.institutional;
+    const cell = (label, v) => {
+      const c = v > 0 ? 'tw-up' : v < 0 ? 'tw-down' : '';
+      const s = v > 0 ? '+' : '';
+      return `<div class="meta-item"><label>${label}</label><span class="${c}">${s}${fmt(v, 1)} 千張</span></div>`;
+    };
+    chipHtml = `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border,#eee);">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:8px;">三大法人買賣超（近 ${it.days} 個交易日）</div>
+      <div class="price-meta">
+        ${cell('外資', it.foreign_5d)}
+        ${cell('投信', it.trust_5d)}
+        ${cell('自營商', it.dealer_5d)}
+        ${cell('合計', it.total_5d)}
+      </div>
+    </div>`;
+  }
 
   let valHtml = '';
   if (d.valuation && (d.valuation.per || d.valuation.yield)) {
@@ -2131,6 +2157,9 @@ function renderResult(d) {
 
     <!-- Strategy Section placeholder -->
     <div id="strategy-result-placeholder"></div>
+
+    <!-- 公司與產業基本面 placeholder（由 ai-zone 回傳後填入）-->
+    <div id="fundamental-placeholder"></div>
 
     <!-- AI Zone placeholder -->
     <div class="buy-zone-card" id="ai-zone-placeholder">
@@ -2340,8 +2369,33 @@ function destroyIfExists(id) {
 }
 
 // ── AI Zone Render ────────────────────────────────────────────────
+function renderFundamentalCard(f) {
+  const slot = document.getElementById('fundamental-placeholder');
+  if (!slot) return;
+  if (!f || typeof f !== 'object') { slot.innerHTML = ''; return; }
+  const rows = [
+    ['🏢', '商業模式', f.business],
+    ['🛡️', '競爭護城河', f.moat],
+    ['📈', '產業趨勢', f.industry],
+    ['🔗', '上下游關係', f.chain],
+    ['🎯', '中長期展望', f.outlook],
+  ].filter(r => r[2] && String(r[2]).trim() && String(r[2]).trim() !== '資料不足');
+  if (!rows.length) { slot.innerHTML = ''; return; }
+  slot.innerHTML = `<div class="res-card fund-card">
+    <div class="res-card-title">🔎 公司與產業基本面<span class="fund-ai-tag">AI 整理</span></div>
+    <div class="fund-list">
+      ${rows.map(r => `<div class="fund-row">
+        <div class="fund-label">${r[0]} ${esc(r[1])}</div>
+        <div class="fund-text">${esc(r[2])}</div>
+      </div>`).join('')}
+    </div>
+    <div class="fund-note">※ 基本面內容由 AI 依既有認識整理，非即時財報數據，僅供研究參考</div>
+  </div>`;
+}
+
 function renderBuyZoneHTML(bz, cur) {
   cur = cur || 'TWD';
+  try { renderFundamentalCard(bz.fundamental); } catch(_) {}
   const eqClass = { excellent: 'eq-excellent', good: 'eq-good', fair: 'eq-fair', poor: 'eq-poor' }[bz.entry_quality] || 'eq-fair';
   const riskClass = { low: 'risk-low', medium: 'risk-medium', high: 'risk-high' }[bz.risk] || 'risk-medium';
   const riskLabel = { low: '低風險', medium: '中等風險', high: '較高風險' }[bz.risk] || '';
