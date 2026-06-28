@@ -21,6 +21,36 @@ module.exports = async function handler(req, res) {
 
   let prompt;
 
+  if (type === 'fundamental') {
+    // 公司與產業基本面（備援用：ai-zone 失敗時前端改打這支）
+    const { name, stock_id, market } = body;
+    const isTW = market !== 'us' && market !== 'jp';
+    prompt = `你是產業分析師。請用你對「${name || stock_id}」（${isTW ? '台股' : market === 'us' ? '美股' : '日股'}，代號 ${stock_id}）這家公司的既有認識，輸出純 JSON（不要 Markdown、不要多餘文字）：
+{"business":"公司主要做什麼、靠什麼賺錢","moat":"競爭護城河與主要對手","industry":"產業現況與中長期趨勢","chain":"上下游關係與議價能力","outlook":"中長期展望與最該留意的風險"}
+每欄用繁體中文 1-3 句具體內容，不要空泛套話。若對該公司確實不熟，該欄填「資料不足」。字串值不要含雙引號或換行。`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 18000);
+    try {
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST", signal: controller.signal,
+        headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+        body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 700, messages: [{ role: "user", content: prompt }] }),
+      });
+      clearTimeout(timeout);
+      if (!r.ok) throw new Error(`Claude ${r.status}`);
+      const json = await r.json();
+      let text = (json.content?.[0]?.text || "").replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+      const s = text.indexOf("{"), e = text.lastIndexOf("}");
+      if (s === -1) throw new Error("無 JSON");
+      const fundamental = JSON.parse(text.slice(s, e + 1).replace(/,(\s*})/g, "$1"));
+      return res.status(200).json({ fundamental });
+    } catch (e) {
+      clearTimeout(timeout);
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   if (type === 'stock') {
     // 個股綜合總結
     const { name, stock_id, price, indicators, valuation, strategy, market } = body;
