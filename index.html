@@ -1996,6 +1996,15 @@ async function fetchAIZone(data, analyst) {
         body: JSON.stringify({ type: 'stock', stock_id: data.stock_id, name: data.name, market: data.market, price: data.price, indicators: data.indicators, valuation: data.valuation, strategy: strategy ? { totalScore: strategy.totalScore, action: strategy.action } : null }),
       });
       const j2 = await r2.json();
+      // 備援時也補抓公司產業基本面，讓「🔎 公司與產業基本面」卡片照樣出現
+      try {
+        const rf = await fetch('/api/mkt-ai', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'fundamental', stock_id: data.stock_id, name: data.name, market: data.market }),
+        });
+        const jf = await rf.json();
+        if (jf.fundamental) renderFundamentalCard(jf.fundamental);
+      } catch(_) {}
       if (j2.summary && el) {
         el.innerHTML = `<div style="padding:14px 18px;">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
