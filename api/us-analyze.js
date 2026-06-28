@@ -113,6 +113,71 @@ module.exports = async function handler(req, res) {
   // ── mode=analyst：分析師共識評等/目標價 ──────────────────────
   // 前端原本呼叫的 /api/analyst 從未存在（Vercel 12 函式已滿），
   // 改為掛在本函式的 mode 參數下，不佔用額外函式名額。
+  // ── mode=peers：同業比較（真實數據）────────────────────────────
+  // AI 先列同業代號，再用 Yahoo 並行抓各檔即時報價與估值，回傳對比表。
+  if (req.query.mode === "peers") {
+    const id = (req.query.stock_id || req.query.symbol || "").trim();
+    const name = (req.query.name || id).trim();
+    const mkt = (req.query.market || "us").toLowerCase();
+    if (!id) return res.status(400).json({ error: "缺少 stock_id" });
+
+    const UA = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" };
+    const suffix = mkt === "tw" ? ".TW" : mkt === "jp" ? ".T" : "";
+    const toYahoo = code => {
+      let c = String(code).trim().toUpperCase().replace(/\.(TW|TWO|T)$/i, "");
+      if (mkt === "us") return c.replace(/\./g, "-");
+      return c + suffix;
+    };
+
+    // 1) 問 AI 要 3-4 個同業
+    let peerList = [];
+    try {
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      const mktLabel = mkt === "tw" ? "台股" : mkt === "jp" ? "日股" : "美股";
+      const prompt = `列出「${name}（${id}）」在${mktLabel}最直接的 3-4 個同業競爭對手（同產業、規模相近、可比較）。只回傳純 JSON 陣列，每個元素含代號與公司簡稱：[{"code":"2303","name":"聯電"}]。${mkt === "tw" ? "code 用台股數字代號。" : mkt === "jp" ? "code 用日股數字代號。" : "code 用美股 ticker。"}不要含「${id}」自己。只回傳 JSON。`;
+      const ar = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST", signal: AbortSignal.timeout(15000),
+        headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+        body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 300, messages: [{ role: "user", content: prompt }] }),
+      });
+      const aj = await ar.json();
+      let t = (aj.content?.[0]?.text || "").replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+      const s = t.indexOf("["), e = t.lastIndexOf("]");
+      if (s !== -1) peerList = JSON.parse(t.slice(s, e + 1));
+    } catch (_) {}
+    if (!Array.isArray(peerList) || !peerList.length) {
+      return res.status(200).json({ available: false, reason: "無法取得同業清單" });
+    }
+    peerList = peerList.slice(0, 4);
+
+    // 2) 並行抓自己 + 同業的 Yahoo 即時報價
+    const allCodes = [{ code: id, name, self: true }, ...peerList.map(p => ({ code: p.code, name: p.name, self: false }))];
+    const fetchQuote = async (item) => {
+      try {
+        const ysym = toYahoo(item.code);
+        const u = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ysym)}?interval=1d&range=1d`;
+        const r = await fetch(u, { headers: UA, signal: AbortSignal.timeout(8000) });
+        if (!r.ok) return null;
+        const j = await r.json();
+        const meta = j?.chart?.result?.[0]?.meta;
+        if (!meta) return null;
+        const price = meta.regularMarketPrice ?? null;
+        const prev = meta.chartPreviousClose ?? meta.previousClose ?? null;
+        const chg = price != null && prev ? Math.round((price - prev) / prev * 10000) / 100 : null;
+        return {
+          code: item.code, name: item.name, self: item.self,
+          price, change_percent: chg,
+          per: meta.trailingPE ? Math.round(meta.trailingPE * 10) / 10 : null,
+          currency: meta.currency || null,
+        };
+      } catch (_) { return null; }
+    };
+    const rows = (await Promise.all(allCodes.map(fetchQuote))).filter(Boolean);
+    if (rows.length < 2) return res.status(200).json({ available: false, reason: "同業報價取得失敗" });
+
+    return res.status(200).json({ available: true, market: mkt, rows });
+  }
+
   if (req.query.mode === "analyst") {
     const id = (req.query.stock_id || req.query.symbol || "").trim();
     if (!id) return res.status(400).json({ error: "缺少 stock_id" });
