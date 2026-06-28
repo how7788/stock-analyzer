@@ -703,6 +703,42 @@ let priceChart = null, macdChart = null, volChart = null;
 let currentHistoryFull = [];
 let chartRange = 60;
 let showBollinger = false;
+
+// ── 股名 → 代號對照表（讓使用者打中文/公司名也能查）──
+const STOCK_NAME_MAP = {
+  // 台股（中文名 → 代號）
+  '台積電':'2330','台積':'2330','tsmc':'2330','鴻海':'2317','聯發科':'2454','台達電':'2308',
+  '富邦金':'2881','國泰金':'2882','聯電':'2303','中華電':'2412','中信金':'2891','廣達':'2382',
+  '台塑':'1301','南亞':'1303','台化':'1326','中鋼':'2002','長榮':'2603','陽明':'2609','萬海':'2615',
+  '大立光':'3008','日月光':'3711','聯詠':'3034','瑞昱':'2379','華碩':'2357','技嘉':'2376','微星':'2377',
+  '緯創':'3231','緯穎':'6669','和碩':'4938','光寶科':'2301','研華':'2395','智邦':'2345','可成':'2474',
+  '兆豐金':'2886','玉山金':'2884','元大金':'2885','第一金':'2892','華南金':'2880','合庫金':'5880',
+  '開發金':'2883','永豐金':'2890','台新金':'2887','新光金':'2888','統一':'1216','統一超':'2912',
+  '台泥':'1101','亞泥':'1102','遠傳':'4904','台灣大':'3045','台灣大哥大':'3045','正新':'2105',
+  '裕隆':'2201','和泰車':'2207','豐泰':'9910','寶成':'9904','儒鴻':'1476','世界':'5347','世界先進':'5347',
+  '南電':'8046','欣興':'3037','華通':'2313','國巨':'2327','台達':'2308','上緯':'3708','力旺':'3529',
+  '創意':'3443','世芯':'3661','世芯-ki':'3661','譜瑞':'4966','譜瑞-ki':'4966','祥碩':'5269','信驊':'5274',
+  '亞德客':'1590','亞德客-ki':'1590','美時':'1795','保瑞':'6472','長榮航':'2618','華航':'2610',
+  '群創':'3481','友達':'2409','彩晶':'6116','台玻':'1802','長春':'','嘉澤':'3533','貿聯':'3665',
+  '貿聯-ki':'3665','智擎':'4162','上銀':'2049','研華':'2395','京元電':'2449','京元電子':'2449',
+  '矽力':'6415','矽力-ki':'6415','英業達':'2356','仁寶':'2324','宏碁':'2353','宏達電':'2498',
+  // 美股（公司名 → ticker）
+  'apple':'AAPL','蘋果':'AAPL','microsoft':'MSFT','微軟':'MSFT','google':'GOOGL','alphabet':'GOOGL','谷歌':'GOOGL',
+  'amazon':'AMZN','亞馬遜':'AMZN','meta':'META','facebook':'META','臉書':'META','nvidia':'NVDA','輝達':'NVDA','英偉達':'NVDA',
+  'tesla':'TSLA','特斯拉':'TSLA','netflix':'NFLX','奈飛':'NFLX','amd':'AMD','intel':'INTC','英特爾':'INTC',
+  'broadcom':'AVGO','博通':'AVGO','qualcomm':'QCOM','高通':'QCOM','berkshire':'BRK.B','波克夏':'BRK.B','巴菲特':'BRK.B',
+  'coca cola':'KO','可口可樂':'KO','disney':'DIS','迪士尼':'DIS','starbucks':'SBUX','星巴克':'SBUX',
+  'palantir':'PLTR','micron':'MU','美光':'MU','arm':'ARM','asml':'ASML','tsm':'TSM',
+};
+function resolveStockName(raw) {
+  const key = raw.trim().toLowerCase();
+  // 完全比對
+  if (STOCK_NAME_MAP[key]) return STOCK_NAME_MAP[key];
+  // 原樣（含原大小寫）比對中文鍵
+  if (STOCK_NAME_MAP[raw.trim()]) return STOCK_NAME_MAP[raw.trim()];
+  return raw; // 找不到就原樣回傳（可能本來就是代號）
+}
+
 let watchlist = [];
 let compareMode = false;
 let compareQueue = [];
@@ -1248,7 +1284,8 @@ function isUS(v) { return /^[A-Za-z]/.test(v.trim()) && !/\.T$/i.test(v.trim());
 function isJP(v) { return /\.T$/i.test(v.trim()) || (document.getElementById('tab-jp')?.classList.contains('active') && /^\d/.test(v.trim())); }
 
 async function analyze() {
-  const raw = document.getElementById('stockInput').value.trim();
+  let raw = document.getElementById('stockInput').value.trim();
+  raw = resolveStockName(raw); // 中文名/公司名 → 代號
   const btn = document.getElementById('searchBtn'), result = document.getElementById('result');
   if (!raw) { result.innerHTML = '<div class="error-box">請輸入股票代號，例如台股 2330 或美股 AAPL</div>'; return; }
 
@@ -1972,6 +2009,7 @@ async function fetchAIZone(data, analyst) {
   fetchStockSummary(data, strategy);
   // 公司產業基本面：完全獨立於 ai-zone，自己抓自己渲染（含除錯顯示）
   fetchFundamental(data);
+  fetchPeers(data);
   const el = document.getElementById('ai-zone-placeholder');
   if (!el) return;
   const cur = data.currency || (data.market === 'us' ? 'USD' : 'TWD');
@@ -2162,6 +2200,9 @@ function renderResult(d) {
 
     <!-- 公司與產業基本面 placeholder（由 ai-zone 回傳後填入）-->
     <div id="fundamental-placeholder"></div>
+
+    <!-- 同業比較 placeholder -->
+    <div id="peers-placeholder"></div>
 
     <!-- AI Zone placeholder -->
     <div class="buy-zone-card" id="ai-zone-placeholder">
@@ -2371,6 +2412,64 @@ function destroyIfExists(id) {
 }
 
 // ── AI Zone Render ────────────────────────────────────────────────
+async function fetchPeers(data) {
+  const slot = document.getElementById('peers-placeholder');
+  if (!slot) return;
+  const mkt = data.market === 'us' ? 'us' : data.market === 'jp' ? 'jp' : 'tw';
+  slot.innerHTML = `<div class="res-card"><div class="res-card-title">⚖️ 同業比較<span class="fund-ai-tag">即時數據</span></div><div class="fund-text" style="padding:8px 0;">同業數據載入中…</div></div>`;
+  try {
+    const q = `mode=peers&stock_id=${encodeURIComponent(data.stock_id)}&name=${encodeURIComponent(data.name || '')}&market=${mkt}`;
+    const r = await fetch('/api/us-analyze?' + q);
+    const j = await r.json();
+    if (!r.ok || !j.available || !Array.isArray(j.rows) || j.rows.length < 2) {
+      slot.innerHTML = '';
+      return;
+    }
+    renderPeersCard(j.rows, mkt);
+  } catch(e) {
+    slot.innerHTML = '';
+  }
+}
+
+function renderPeersCard(rows, mkt) {
+  const slot = document.getElementById('peers-placeholder');
+  if (!slot) return;
+  const isTW = mkt === 'tw';
+  // 漲跌上色：台股紅漲綠跌；美日綠漲紅跌
+  const chgClass = v => v == null ? '' : (v > 0 ? (isTW ? 'tw-up' : 'us-up') : v < 0 ? (isTW ? 'tw-down' : 'us-down') : '');
+  // PER 對比：用同業中位數判斷貴/便宜
+  const pers = rows.map(r => r.per).filter(v => v != null && v > 0).sort((a,b)=>a-b);
+  const perMid = pers.length ? pers[Math.floor(pers.length/2)] : null;
+  const perTag = v => {
+    if (v == null || !perMid) return '';
+    if (v > perMid * 1.2) return '<span style="color:var(--red);font-size:10px;margin-left:4px;">偏貴</span>';
+    if (v < perMid * 0.8) return '<span style="color:var(--green);font-size:10px;margin-left:4px;">偏低</span>';
+    return '';
+  };
+  const fmtP = v => v == null ? '—' : Number(v).toLocaleString('en', { maximumFractionDigits: 2 });
+  const head = `<tr style="border-bottom:1px solid var(--border);">
+    <th style="text-align:left;padding:8px 6px;font-size:11px;color:var(--text2);font-weight:600;">公司</th>
+    <th style="text-align:right;padding:8px 6px;font-size:11px;color:var(--text2);font-weight:600;">股價</th>
+    <th style="text-align:right;padding:8px 6px;font-size:11px;color:var(--text2);font-weight:600;">漲跌</th>
+    <th style="text-align:right;padding:8px 6px;font-size:11px;color:var(--text2);font-weight:600;">本益比</th>
+  </tr>`;
+  const body = rows.map(r => {
+    const selfBg = r.self ? 'background:var(--card2);font-weight:700;' : '';
+    const nm = r.self ? `${esc(r.name || r.code)} ★` : esc(r.name || r.code);
+    return `<tr style="border-bottom:1px solid var(--border);${selfBg}">
+      <td style="padding:9px 6px;font-size:13px;">${nm}<span style="color:var(--text3);font-size:10px;margin-left:5px;">${esc(r.code)}</span></td>
+      <td style="padding:9px 6px;font-size:13px;text-align:right;">${fmtP(r.price)}</td>
+      <td style="padding:9px 6px;font-size:13px;text-align:right;" class="${chgClass(r.change_percent)}">${r.change_percent == null ? '—' : (r.change_percent>0?'+':'')+r.change_percent+'%'}</td>
+      <td style="padding:9px 6px;font-size:13px;text-align:right;">${fmtP(r.per)}${perTag(r.per)}</td>
+    </tr>`;
+  }).join('');
+  slot.innerHTML = `<div class="res-card">
+    <div class="res-card-title">⚖️ 同業比較<span class="fund-ai-tag">即時數據</span></div>
+    <table style="width:100%;border-collapse:collapse;margin-top:6px;">${head}${body}</table>
+    <div class="fund-note">★ 為查詢標的｜同業清單由 AI 挑選、報價為 Yahoo 即時資料｜本益比「偏貴/偏低」相對同業中位數</div>
+  </div>`;
+}
+
 async function fetchFundamental(data) {
   const slot = document.getElementById('fundamental-placeholder');
   if (!slot) return;
