@@ -1970,6 +1970,8 @@ async function fetchAIZone(data, analyst) {
 
   // 立即啟動綜合總結 AI（輕量，獨立於 ai-zone）
   fetchStockSummary(data, strategy);
+  // 公司產業基本面：完全獨立於 ai-zone，自己抓自己渲染（含除錯顯示）
+  fetchFundamental(data);
   const el = document.getElementById('ai-zone-placeholder');
   if (!el) return;
   const cur = data.currency || (data.market === 'us' ? 'USD' : 'TWD');
@@ -1996,15 +1998,6 @@ async function fetchAIZone(data, analyst) {
         body: JSON.stringify({ type: 'stock', stock_id: data.stock_id, name: data.name, market: data.market, price: data.price, indicators: data.indicators, valuation: data.valuation, strategy: strategy ? { totalScore: strategy.totalScore, action: strategy.action } : null }),
       });
       const j2 = await r2.json();
-      // 備援時也補抓公司產業基本面，讓「🔎 公司與產業基本面」卡片照樣出現
-      try {
-        const rf = await fetch('/api/mkt-ai', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'fundamental', stock_id: data.stock_id, name: data.name, market: data.market }),
-        });
-        const jf = await rf.json();
-        if (jf.fundamental) renderFundamentalCard(jf.fundamental);
-      } catch(_) {}
       if (j2.summary && el) {
         el.innerHTML = `<div style="padding:14px 18px;">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
@@ -2378,6 +2371,28 @@ function destroyIfExists(id) {
 }
 
 // ── AI Zone Render ────────────────────────────────────────────────
+async function fetchFundamental(data) {
+  const slot = document.getElementById('fundamental-placeholder');
+  if (!slot) return;
+  // 先顯示載入中（順便證明這段程式有在跑）
+  slot.innerHTML = `<div class="res-card fund-card"><div class="res-card-title">🔎 公司與產業基本面<span class="fund-ai-tag">AI 整理</span></div><div class="fund-text" style="padding:8px 0;">基本面分析生成中…</div></div>`;
+  try {
+    const r = await fetch('/api/mkt-ai', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'fundamental', stock_id: data.stock_id, name: data.name, market: data.market }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    if (j.fundamental) {
+      renderFundamentalCard(j.fundamental);
+    } else {
+      slot.innerHTML = `<div class="res-card fund-card"><div class="res-card-title">🔎 公司與產業基本面</div><div class="fund-text" style="padding:8px 0;color:var(--text3);">回傳格式異常：${esc(JSON.stringify(j).slice(0,150))}</div></div>`;
+    }
+  } catch(e) {
+    slot.innerHTML = `<div class="res-card fund-card"><div class="res-card-title">🔎 公司與產業基本面</div><div class="fund-text" style="padding:8px 0;color:var(--text3);">基本面暫時無法載入：${esc(e.message)}</div></div>`;
+  }
+}
+
 function renderFundamentalCard(f) {
   const slot = document.getElementById('fundamental-placeholder');
   if (!slot) return;
@@ -2404,7 +2419,6 @@ function renderFundamentalCard(f) {
 
 function renderBuyZoneHTML(bz, cur) {
   cur = cur || 'TWD';
-  try { renderFundamentalCard(bz.fundamental); } catch(_) {}
   const eqClass = { excellent: 'eq-excellent', good: 'eq-good', fair: 'eq-fair', poor: 'eq-poor' }[bz.entry_quality] || 'eq-fair';
   const riskClass = { low: 'risk-low', medium: 'risk-medium', high: 'risk-high' }[bz.risk] || 'risk-medium';
   const riskLabel = { low: '低風險', medium: '中等風險', high: '較高風險' }[bz.risk] || '';
