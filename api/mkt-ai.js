@@ -38,11 +38,17 @@ module.exports = async function handler(req, res) {
         body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 700, messages: [{ role: "user", content: prompt }] }),
       });
       clearTimeout(timeout);
-      if (!r.ok) throw new Error(`Claude ${r.status}`);
+      if (!r.ok) {
+        // 把 Claude 回傳的真正錯誤露出來，方便定位
+        let detail = "";
+        try { const ej = await r.json(); detail = ej?.error?.message || JSON.stringify(ej).slice(0, 200); }
+        catch (_) { try { detail = (await r.text()).slice(0, 200); } catch (_2) {} }
+        return res.status(500).json({ error: `Claude ${r.status}: ${detail}` });
+      }
       const json = await r.json();
       let text = (json.content?.[0]?.text || "").replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
       const s = text.indexOf("{"), e = text.lastIndexOf("}");
-      if (s === -1) throw new Error("無 JSON");
+      if (s === -1) throw new Error("AI 未回傳 JSON");
       const fundamental = JSON.parse(text.slice(s, e + 1).replace(/,(\s*})/g, "$1"));
       return res.status(200).json({ fundamental });
     } catch (e) {
