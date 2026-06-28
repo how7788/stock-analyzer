@@ -1,5 +1,17 @@
 {
   "version": 2,
+  "functions": {
+    "api/ai-zone.js": { "maxDuration": 60 },
+    "api/analyze.js": { "maxDuration": 30 },
+    "api/us-analyze.js": { "maxDuration": 30 },
+    "api/jp-analyze.js": { "maxDuration": 30 },
+    "api/mkt-ai.js": { "maxDuration": 60 },
+    "api/market-analyze.js": { "maxDuration": 60 },
+    "api/hot-themes.js": { "maxDuration": 60 },
+    "api/daily-focus.js": { "maxDuration": 60 },
+    "api/strategy-merge.js": { "maxDuration": 60 },
+    "api/news.js": { "maxDuration": 30 }
+  },
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
