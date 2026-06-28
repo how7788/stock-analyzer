@@ -117,16 +117,33 @@ ${(strategy && strategy.totalScore != null) ? "\n策略模組已計算總分："
 
 fundamental 各欄請用你對該公司的既有認識填寫具體內容（中文，每欄 1-3 句，不要空泛套話）；若對該公司確實不熟，該欄填「資料不足」。verdict 只能是 buy/watch/avoid。entry_quality 只能是 excellent/good/fair/poor。risk 只能是 low/medium/high。score 0-100。stop_loss/target 給實際價格數字。${chipStr ? 'checklist 中法人籌碼 item 要根據實際籌碼資料判斷。' : 'checklist 中法人籌碼 status 設 null，note 依 market 設：美股設「美股無此資料」，台股設「籌碼資料暫不可用」，日股設「日股無此資料」。'}${analystStr ? ' 請參考分析師共識評等與目標價輔助判斷 score 與 verdict，並在 reason 中提及。' : ''}`;
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25000);
+  // Claude API 偶爾會卡住觸發 abort，這裡自動重試一次，大幅降低失敗率
+  async function callClaude(timeoutMs) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST", signal: controller.signal,
+        headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+        body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 2000, messages: [{ role: "user", content: prompt }] }),
+      });
+      clearTimeout(timeout);
+      return r;
+    } catch (err) {
+      clearTimeout(timeout);
+      throw err;
+    }
+  }
 
   try {
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST", signal: controller.signal,
-      headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 2200, messages: [{ role: "user", content: prompt }] }),
-    });
-    clearTimeout(timeout);
+    let r;
+    try {
+      r = await callClaude(22000);
+    } catch (firstErr) {
+      // 第一次失敗（多半是 abort/超時），立刻重試一次，給較短的時間避免整體爆掉
+      console.warn("[ai-zone] 第一次失敗，重試：", firstErr.message);
+      r = await callClaude(20000);
+    }
     if (!r.ok) throw new Error(`Claude API 錯誤 ${r.status}`);
 
     const json = await r.json();
